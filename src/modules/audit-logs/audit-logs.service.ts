@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 
 const DEFAULT_PAGE = 1;
@@ -18,12 +18,12 @@ export interface CreateAuditLogDto {
 
 @Injectable()
 export class AuditLogsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── log ─────────────────────────────────────────────────────────────────────
 
   async log(dto: CreateAuditLogDto) {
-    return this.prisma.auditLog.create({
+    return this.database.auditLog.create({
       data: {
         actorId: dto.actorId,
         action: dto.action,
@@ -79,8 +79,8 @@ export class AuditLogsService {
       }
     }
 
-    const [logs, total] = await this.prisma.$transaction([
-      this.prisma.auditLog.findMany({
+    const [logs, total] = await this.database.$transaction([
+      this.database.auditLog.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -99,7 +99,7 @@ export class AuditLogsService {
           },
         },
       }),
-      this.prisma.auditLog.count({ where }),
+      this.database.auditLog.count({ where }),
     ]);
 
     return {

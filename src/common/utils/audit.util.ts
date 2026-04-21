@@ -1,4 +1,4 @@
-import { PrismaService } from '../prisma/prisma.service';
+import { DatabaseService } from '../database/database.service';
 
 /**
  * Parameters accepted by createAuditLog().
@@ -8,7 +8,7 @@ export interface CreateAuditLogParams {
   actorId?: string | null;
   /** Human-readable action label, e.g. "APPLICATION_SUBMITTED" */
   action: string;
-  /** Prisma model / entity name, e.g. "Application" */
+  /** Human-readable entity name, e.g. "Application" */
   targetEntity: string;
   /** Primary-key value of the affected record */
   targetId: string;
@@ -27,7 +27,7 @@ export interface CreateAuditLogParams {
  * occurs (submissions, decisions, payments, etc.).
  *
  * @example
- * await createAuditLog(this.prisma, {
+ * await createAuditLog(this.database, {
  *   actorId: user.id,
  *   action: 'APPLICATION_SUBMITTED',
  *   targetEntity: 'Application',
@@ -38,11 +38,11 @@ export interface CreateAuditLogParams {
  * });
  */
 export async function createAuditLog(
-  prisma: PrismaService,
+  database: DatabaseService,
   params: CreateAuditLogParams,
 ): Promise<void> {
   try {
-    await prisma.auditLog.create({
+    await database.auditLog.create({
       data: {
         actorId: params.actorId ?? null,
         action: params.action,

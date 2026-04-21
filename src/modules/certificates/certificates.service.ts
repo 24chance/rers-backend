@@ -4,17 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 @Injectable()
 export class CertificatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── generate ─────────────────────────────────────────────────────────────────
 
   async generate(applicationId: string, decisionId: string) {
     // Check if certificate already exists for this decision
-    const existing = await this.prisma.certificate.findUnique({
+    const existing = await this.database.certificate.findUnique({
       where: { decisionId },
     });
 
@@ -28,7 +28,7 @@ export class CertificatesService {
     const expiresAt = new Date(issuedAt);
     expiresAt.setFullYear(expiresAt.getFullYear() + 2);
 
-    return this.prisma.certificate.create({
+    return this.database.certificate.create({
       data: {
         applicationId,
         decisionId,
@@ -56,7 +56,7 @@ export class CertificatesService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -65,7 +65,7 @@ export class CertificatesService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    const certificate = await this.prisma.certificate.findFirst({
+    const certificate = await this.database.certificate.findFirst({
       where: { applicationId },
       include: {
         application: {
@@ -94,7 +94,7 @@ export class CertificatesService {
   // ─── verify ──────────────────────────────────────────────────────────────────
 
   async verify(token: string) {
-    const certificate = await this.prisma.certificate.findUnique({
+    const certificate = await this.database.certificate.findUnique({
       where: { verificationToken: token },
       include: {
         application: {
@@ -149,7 +149,7 @@ export class CertificatesService {
   // ─── download ─────────────────────────────────────────────────────────────────
 
   async download(applicationId: string, userId: string) {
-    const certificate = await this.prisma.certificate.findFirst({
+    const certificate = await this.database.certificate.findFirst({
       where: { applicationId },
       include: {
         application: {
@@ -186,7 +186,7 @@ export class CertificatesService {
     const year = new Date().getFullYear();
     const prefix = `CERT-${year}-`;
 
-    const count = await this.prisma.certificate.count({
+    const count = await this.database.certificate.count({
       where: { certificateNumber: { startsWith: prefix } },
     });
 

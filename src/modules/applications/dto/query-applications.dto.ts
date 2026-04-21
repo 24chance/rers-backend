@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ApplicationStatus, ApplicationType } from '@prisma/client';
+import { ApplicationStatus, ApplicationType } from '../../../common/enums';
 import {
   IsEnum,
   IsNumberString,
@@ -43,4 +43,12 @@ export class QueryApplicationsDto {
   @IsOptional()
   @IsNumberString()
   pageSize?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias for pageSize; accepted for compatibility with limit-based clients',
+    example: '20',
+  })
+  @IsOptional()
+  @IsNumberString()
+  limit?: string;
 }

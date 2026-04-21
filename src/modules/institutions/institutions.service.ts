@@ -3,18 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateInstitutionDto } from './dto/create-institution.dto';
 import { UpdateInstitutionDto } from './dto/update-institution.dto';
 
 @Injectable()
 export class InstitutionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
   async create(dto: CreateInstitutionDto) {
-    const existing = await this.prisma.institution.findUnique({
+    const existing = await this.database.institution.findUnique({
       where: { code: dto.code },
     });
 
@@ -24,7 +24,7 @@ export class InstitutionsService {
       );
     }
 
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.database.tenant.findUnique({
       where: { id: dto.tenantId },
     });
 
@@ -32,7 +32,7 @@ export class InstitutionsService {
       throw new NotFoundException(`Tenant with id "${dto.tenantId}" not found.`);
     }
 
-    return this.prisma.institution.create({
+    return this.database.institution.create({
       data: {
         name: dto.name,
         code: dto.code,
@@ -60,7 +60,7 @@ export class InstitutionsService {
       where.name = { contains: search, mode: 'insensitive' };
     }
 
-    return this.prisma.institution.findMany({
+    return this.database.institution.findMany({
       where,
       include: {
         tenant: { select: { id: true, name: true, code: true } },
@@ -73,7 +73,7 @@ export class InstitutionsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const institution = await this.prisma.institution.findUnique({
+    const institution = await this.database.institution.findUnique({
       where: { id },
       include: {
         tenant: { select: { id: true, name: true, code: true } },
@@ -91,7 +91,7 @@ export class InstitutionsService {
   // ─── findByTenant ─────────────────────────────────────────────────────────────
 
   async findByTenant(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.database.tenant.findUnique({
       where: { id: tenantId },
     });
 
@@ -99,7 +99,7 @@ export class InstitutionsService {
       throw new NotFoundException(`Tenant with id "${tenantId}" not found.`);
     }
 
-    return this.prisma.institution.findMany({
+    return this.database.institution.findMany({
       where: { tenantId },
       include: {
         tenant: { select: { id: true, name: true, code: true } },
@@ -114,7 +114,7 @@ export class InstitutionsService {
   async update(id: string, dto: UpdateInstitutionDto) {
     await this.findOne(id);
 
-    return this.prisma.institution.update({
+    return this.database.institution.update({
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),

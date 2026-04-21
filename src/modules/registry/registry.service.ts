@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApplicationStatus } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CertificatesService } from '../certificates/certificates.service';
 
 const DEFAULT_PAGE = 1;
@@ -10,7 +10,7 @@ const MAX_PAGE_SIZE = 100;
 @Injectable()
 export class RegistryService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly database: DatabaseService,
     private readonly certificatesService: CertificatesService,
   ) {}
 
@@ -41,8 +41,8 @@ export class RegistryService {
       where.title = { contains: filters.search, mode: 'insensitive' };
     }
 
-    const [applications, total] = await this.prisma.$transaction([
-      this.prisma.application.findMany({
+    const [applications, total] = await this.database.$transaction([
+      this.database.application.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -63,7 +63,7 @@ export class RegistryService {
           },
         },
       }),
-      this.prisma.application.count({ where }),
+      this.database.application.count({ where }),
     ]);
 
     const data = applications.map((app) => ({
@@ -91,7 +91,7 @@ export class RegistryService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const application = await this.prisma.application.findFirst({
+    const application = await this.database.application.findFirst({
       where: { id, status: ApplicationStatus.APPROVED },
       select: {
         id: true,

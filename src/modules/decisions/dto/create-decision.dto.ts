@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DecisionType } from '@prisma/client';
+import { DecisionType } from '../../../common/enums';
 
 export class CreateDecisionDto {
   @ApiProperty({ enum: DecisionType, description: 'Type of decision' })

@@ -11,7 +11,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { ApplicationType } from '@prisma/client';
+import { ApplicationType } from '../../../common/enums';
 
 export class CreateApplicationDto {
   @ApiProperty({ example: 'Efficacy of Malaria Vaccine in Children Under 5' })
@@ -23,10 +23,10 @@ export class CreateApplicationDto {
   @IsEnum(ApplicationType)
   type: ApplicationType;
 
-  @ApiProperty({ description: 'UUID of the tenant submitting the application' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ description: 'UUID of the IRB tenant the applicant is submitting to' })
+  @IsOptional()
   @IsUUID()
-  tenantId: string;
+  tenantId?: string;
 
   @ApiPropertyOptional({ description: 'UUID of the destination institution' })
   @IsOptional()

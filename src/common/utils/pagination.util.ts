@@ -70,9 +70,9 @@ export function paginateResponse<T>(
 }
 
 /**
- * Converts PaginationDto fields to Prisma `skip` / `take` values.
+ * Converts PaginationDto fields to plain `skip` / `take` values.
  */
-export function toPrismaPage(dto: PaginationDto): { skip: number; take: number } {
+export function toPageWindow(dto: PaginationDto): { skip: number; take: number } {
   const page = dto.page ?? 1;
   const pageSize = dto.pageSize ?? 20;
   return {

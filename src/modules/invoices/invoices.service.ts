@@ -2,18 +2,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, NotificationType } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApplicationStatus, NotificationType } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 
 @Injectable()
 export class InvoicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
   async create(applicationId: string, dto: CreateInvoiceDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, status: true, title: true, applicantId: true },
     });
@@ -22,7 +22,7 @@ export class InvoicesService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    const invoice = await this.prisma.invoice.create({
+    const invoice = await this.database.invoice.create({
       data: {
         applicationId,
         amount: dto.amount,
@@ -38,12 +38,12 @@ export class InvoicesService {
     });
 
     // Update application status to PAYMENT_PENDING
-    await this.prisma.application.update({
+    await this.database.application.update({
       where: { id: applicationId },
       data: { status: ApplicationStatus.PAYMENT_PENDING },
     });
 
-    await this.prisma.workflowTransition.create({
+    await this.database.workflowTransition.create({
       data: {
         applicationId,
         fromStatus: application.status,
@@ -53,7 +53,7 @@ export class InvoicesService {
     });
 
     // Notify applicant
-    await this.prisma.notification.create({
+    await this.database.notification.create({
       data: {
         userId: application.applicantId,
         type: NotificationType.PAYMENT_PENDING,
@@ -69,7 +69,7 @@ export class InvoicesService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -78,7 +78,7 @@ export class InvoicesService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    return this.prisma.invoice.findMany({
+    return this.database.invoice.findMany({
       where: { applicationId },
       include: {
         payments: {
@@ -110,7 +110,7 @@ export class InvoicesService {
       where.status = filters.status;
     }
 
-    return this.prisma.invoice.findMany({
+    return this.database.invoice.findMany({
       where,
       include: {
         application: {

@@ -4,10 +4,10 @@ import { IsString, MinLength } from 'class-validator';
 export class ResetPasswordDto {
   @ApiProperty({ description: 'Reset token received via email/response' })
   @IsString()
-  token: string;
+  token!: string;
 
-  @ApiProperty({ example: 'NewP@ssw0rd!', minLength: 8 })
+  @ApiProperty({ example: 'NewP@ss!', minLength: 6 })
   @IsString()
-  @MinLength(8)
-  newPassword: string;
+  @MinLength(6)
+  password!: string;
 }

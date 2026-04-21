@@ -3,19 +3,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApplicationStatus } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { RespondQueryDto } from './dto/respond-query.dto';
 
 @Injectable()
 export class QueriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── raiseQuery ───────────────────────────────────────────────────────────────
 
   async raiseQuery(applicationId: string, adminId: string, dto: CreateQueryDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, status: true },
     });
@@ -26,7 +26,7 @@ export class QueriesService {
       );
     }
 
-    const query = await this.prisma.query.create({
+    const query = await this.database.query.create({
       data: {
         applicationId,
         raisedById: adminId,
@@ -37,12 +37,12 @@ export class QueriesService {
 
     // Update application status to QUERY_RAISED if not already
     if (application.status !== ApplicationStatus.QUERY_RAISED) {
-      await this.prisma.application.update({
+      await this.database.application.update({
         where: { id: applicationId },
         data: { status: ApplicationStatus.QUERY_RAISED },
       });
 
-      await this.prisma.workflowTransition.create({
+      await this.database.workflowTransition.create({
         data: {
           applicationId,
           fromStatus: application.status,
@@ -59,7 +59,7 @@ export class QueriesService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -70,12 +70,18 @@ export class QueriesService {
       );
     }
 
-    return this.prisma.query.findMany({
+    return this.database.query.findMany({
       where: { applicationId },
       include: {
-        responses: { orderBy: { createdAt: 'asc' } },
+        raisedBy: { select: { id: true, firstName: true, lastName: true } },
+        responses: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            responder: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
@@ -87,7 +93,7 @@ export class QueriesService {
     userId: string,
     dto: RespondQueryDto,
   ) {
-    const query = await this.prisma.query.findFirst({
+    const query = await this.database.query.findFirst({
       where: { id: queryId, applicationId },
     });
 
@@ -103,7 +109,7 @@ export class QueriesService {
       );
     }
 
-    const response = await this.prisma.queryResponse.create({
+    const response = await this.database.queryResponse.create({
       data: {
         queryId,
         responderId: userId,
@@ -112,18 +118,18 @@ export class QueriesService {
     });
 
     // Update the application status to RESPONSE_RECEIVED
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { status: true },
     });
 
     if (application && application.status === ApplicationStatus.QUERY_RAISED) {
-      await this.prisma.application.update({
+      await this.database.application.update({
         where: { id: applicationId },
         data: { status: ApplicationStatus.RESPONSE_RECEIVED },
       });
 
-      await this.prisma.workflowTransition.create({
+      await this.database.workflowTransition.create({
         data: {
           applicationId,
           fromStatus: ApplicationStatus.QUERY_RAISED,
@@ -140,7 +146,7 @@ export class QueriesService {
   // ─── resolveQuery ─────────────────────────────────────────────────────────────
 
   async resolveQuery(applicationId: string, queryId: string) {
-    const query = await this.prisma.query.findFirst({
+    const query = await this.database.query.findFirst({
       where: { id: queryId, applicationId },
     });
 
@@ -156,7 +162,7 @@ export class QueriesService {
       );
     }
 
-    return this.prisma.query.update({
+    return this.database.query.update({
       where: { id: queryId },
       data: { isResolved: true, resolvedAt: new Date() },
       include: { responses: { orderBy: { createdAt: 'asc' } } },

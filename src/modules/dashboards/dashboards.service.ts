@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus } from '../../common/enums';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 @Injectable()
 export class DashboardsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── getSummary ───────────────────────────────────────────────────────────────
 
@@ -22,45 +22,84 @@ export class DashboardsService {
     return this.getTenantSummary(tenantId ?? undefined);
   }
 
-  // ─── getApplicantSummary ──────────────────────────────────────────────────────
+  // ─── getApplicantDashboard ────────────────────────────────────────────────────
 
-  private async getApplicantSummary(userId: string) {
+  async getApplicantDashboard(userId: string) {
     const [
-      totalSubmissions,
-      pendingScreening,
-      pendingReview,
-      approved,
-      rejected,
-      paymentPending,
-    ] = await this.prisma.$transaction([
-      this.prisma.application.count({ where: { applicantId: userId } }),
-      this.prisma.application.count({
-        where: { applicantId: userId, status: ApplicationStatus.SCREENING },
+      totalApplications,
+      draftApplications,
+      underReviewApplications,
+      approvedApplications,
+    ] = await this.database.$transaction([
+      this.database.application.count({ where: { applicantId: userId } }),
+      this.database.application.count({
+        where: { applicantId: userId, status: ApplicationStatus.DRAFT },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { applicantId: userId, status: ApplicationStatus.UNDER_REVIEW },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { applicantId: userId, status: ApplicationStatus.APPROVED },
-      }),
-      this.prisma.application.count({
-        where: { applicantId: userId, status: ApplicationStatus.REJECTED },
-      }),
-      this.prisma.application.count({
-        where: { applicantId: userId, status: ApplicationStatus.PAYMENT_PENDING },
       }),
     ]);
 
+    const recentApplications = await this.database.application.findMany({
+      where: { applicantId: userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        referenceNumber: true,
+        title: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+
     return {
-      totalSubmissions,
-      pendingScreening,
-      pendingReview,
-      approved,
-      rejected,
-      paymentPending,
-      activeMonitoring: 0,
-      reviewerWorkload: [],
+      totalApplications,
+      draftApplications,
+      underReviewApplications,
+      approvedApplications,
+      recentApplications,
     };
+  }
+
+  // ─── getReviewerDashboard ─────────────────────────────────────────────────────
+
+  async getReviewerDashboard(userId: string) {
+    const [assignedReviews, completedReviews] = await this.database.$transaction([
+      this.database.reviewAssignment.count({ where: { reviewerId: userId, isActive: true } }),
+      this.database.review.count({ where: { reviewerId: userId, isComplete: true } }),
+    ]);
+
+    const recentAssignments = await this.database.reviewAssignment.findMany({
+      where: { reviewerId: userId, isActive: true },
+      orderBy: { assignedAt: 'desc' },
+      take: 5,
+      include: {
+        application: { select: { id: true, title: true, referenceNumber: true } },
+      },
+    });
+
+    return {
+      assignedReviews,
+      completedReviews,
+      pendingReviews: assignedReviews - completedReviews,
+      recentAssignments: recentAssignments.map((a) => ({
+        id: a.id,
+        applicationId: a.applicationId,
+        applicationTitle: a.application?.title ?? '',
+        referenceNumber: a.application?.referenceNumber ?? '',
+        isComplete: !a.isActive,
+      })),
+    };
+  }
+
+  // ─── getApplicantSummary (legacy alias) ────────────────────────────────────────
+
+  private async getApplicantSummary(userId: string) {
+    return this.getApplicantDashboard(userId);
   }
 
   // ─── getTenantSummary ─────────────────────────────────────────────────────────
@@ -76,37 +115,37 @@ export class DashboardsService {
       rejected,
       paymentPending,
       activeMonitoring,
-    ] = await this.prisma.$transaction([
-      this.prisma.application.count({ where }),
-      this.prisma.application.count({
+    ] = await this.database.$transaction([
+      this.database.application.count({ where }),
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.SCREENING },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.UNDER_REVIEW },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.APPROVED },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.REJECTED },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.PAYMENT_PENDING },
       }),
-      this.prisma.application.count({
+      this.database.application.count({
         where: { ...where, status: ApplicationStatus.MONITORING_ACTIVE },
       }),
     ]);
 
     // Reviewer workload
-    const reviewerWorkload = await this.prisma.reviewAssignment.groupBy({
+    const reviewerWorkload = await this.database.reviewAssignment.groupBy({
       by: ['reviewerId'],
       where: { isActive: true, ...(tenantId ? { application: { tenantId } } : {}) },
       _count: { reviewerId: true },
     });
 
     const reviewerIds = reviewerWorkload.map((r) => r.reviewerId);
-    const reviewers = await this.prisma.user.findMany({
+    const reviewers = await this.database.user.findMany({
       where: { id: { in: reviewerIds } },
       select: { id: true, firstName: true, lastName: true },
     });
@@ -139,22 +178,22 @@ export class DashboardsService {
     const global = await this.getTenantSummary();
 
     // Per-tenant breakdown
-    const tenants = await this.prisma.tenant.findMany({
+    const tenants = await this.database.tenant.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true },
     });
 
     const tenantBreakdowns = await Promise.all(
       tenants.map(async (tenant) => {
-        const counts = await this.prisma.$transaction([
-          this.prisma.application.count({ where: { tenantId: tenant.id } }),
-          this.prisma.application.count({
+        const counts = await this.database.$transaction([
+          this.database.application.count({ where: { tenantId: tenant.id } }),
+          this.database.application.count({
             where: { tenantId: tenant.id, status: ApplicationStatus.APPROVED },
           }),
-          this.prisma.application.count({
+          this.database.application.count({
             where: { tenantId: tenant.id, status: ApplicationStatus.UNDER_REVIEW },
           }),
-          this.prisma.application.count({
+          this.database.application.count({
             where: { tenantId: tenant.id, status: ApplicationStatus.REJECTED },
           }),
         ]);

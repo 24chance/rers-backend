@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ReviewRecommendation } from '@prisma/client';
+import { ReviewRecommendation } from '../../../common/enums';
 
 export class SubmitReviewDto {
   @ApiProperty({ description: 'Review comments', minLength: 10 })

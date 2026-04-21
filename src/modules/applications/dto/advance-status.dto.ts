@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus } from '../../../common/enums';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class AdvanceStatusDto {

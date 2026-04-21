@@ -4,9 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus } from '../../common/enums';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { AdvanceStatusDto } from './dto/advance-status.dto';
 import { CreateApplicationDto } from './dto/create-application.dto';
@@ -21,7 +21,7 @@ const MAX_PAGE_SIZE = 100;
 @Injectable()
 export class ApplicationsService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly database: DatabaseService,
     private readonly workflowsService: WorkflowsService,
   ) {}
 
@@ -32,7 +32,7 @@ export class ApplicationsService {
     const prefix = `RNEC-${year}-`;
 
     // Count existing applications with a referenceNumber for this year
-    const count = await this.prisma.application.count({
+    const count = await this.database.application.count({
       where: { referenceNumber: { startsWith: prefix } },
     });
 
@@ -42,21 +42,13 @@ export class ApplicationsService {
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
-  async create(userId: string, dto: CreateApplicationDto) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: dto.tenantId },
-    });
-
-    if (!tenant) {
-      throw new NotFoundException(`Tenant with id "${dto.tenantId}" not found.`);
-    }
-
-    const application = await this.prisma.application.create({
+  async create(userId: string, userTenantId: string | null, dto: CreateApplicationDto) {
+    const application = await this.database.application.create({
       data: {
         title: dto.title,
         type: dto.type,
         status: ApplicationStatus.DRAFT,
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId ?? userTenantId,
         applicantId: userId,
         destinationId: dto.destinationId,
         principalInvestigator: dto.principalInvestigator,
@@ -77,7 +69,7 @@ export class ApplicationsService {
     });
 
     // Record initial DRAFT workflow transition (no fromStatus)
-    await this.prisma.workflowTransition.create({
+    await this.database.workflowTransition.create({
       data: {
         applicationId: application.id,
         fromStatus: undefined,
@@ -99,9 +91,10 @@ export class ApplicationsService {
     filters: QueryApplicationsDto,
   ) {
     const page = Math.max(1, parseInt(filters.page ?? '1', 10) || DEFAULT_PAGE);
+    const requestedPageSize = filters.pageSize ?? filters.limit ?? '20';
     const pageSize = Math.min(
       MAX_PAGE_SIZE,
-      Math.max(1, parseInt(filters.pageSize ?? '20', 10) || DEFAULT_PAGE_SIZE),
+      Math.max(1, parseInt(requestedPageSize, 10) || DEFAULT_PAGE_SIZE),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,15 +132,15 @@ export class ApplicationsService {
       where.title = { contains: filters.search, mode: 'insensitive' };
     }
 
-    const [applications, total] = await this.prisma.$transaction([
-      this.prisma.application.findMany({
+    const [applications, total] = await this.database.$transaction([
+      this.database.application.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
         include: this.defaultInclude(),
       }),
-      this.prisma.application.count({ where }),
+      this.database.application.count({ where }),
     ]);
 
     return {
@@ -164,7 +157,7 @@ export class ApplicationsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string, userId: string, role: UserRole) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id },
       include: {
         ...this.defaultInclude(),
@@ -192,7 +185,7 @@ export class ApplicationsService {
     if (
       role === UserRole.IRB_ADMIN
     ) {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.database.user.findUnique({
         where: { id: userId },
         select: { tenantId: true },
       });
@@ -210,7 +203,7 @@ export class ApplicationsService {
   // ─── update ──────────────────────────────────────────────────────────────────
 
   async update(id: string, userId: string, dto: UpdateApplicationDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id },
       select: { id: true, status: true, applicantId: true },
     });
@@ -229,7 +222,7 @@ export class ApplicationsService {
       throw new ForbiddenException('You can only edit your own applications.');
     }
 
-    return this.prisma.application.update({
+    return this.database.application.update({
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
@@ -267,7 +260,7 @@ export class ApplicationsService {
   // ─── submit ──────────────────────────────────────────────────────────────────
 
   async submit(id: string, userId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id },
       include: { documents: true },
     });
@@ -286,11 +279,11 @@ export class ApplicationsService {
       throw new ForbiddenException('You can only submit your own applications.');
     }
 
-    if (application.documents.length === 0) {
-      throw new BadRequestException(
-        'At least one document must be attached before submission.',
-      );
-    }
+    // if (application.documents.length === 0) {
+    //   throw new BadRequestException(
+    //     'At least one document must be attached before submission.',
+    //   );
+    // }
 
     // Validate the transition in the state machine
     this.workflowsService.validateTransition(
@@ -300,7 +293,7 @@ export class ApplicationsService {
 
     const referenceNumber = await this.generateReferenceNumber();
 
-    const updated = await this.prisma.application.update({
+    const updated = await this.database.application.update({
       where: { id },
       data: {
         status: ApplicationStatus.SUBMITTED,
@@ -325,7 +318,7 @@ export class ApplicationsService {
   // ─── screen ──────────────────────────────────────────────────────────────────
 
   async screen(id: string, adminId: string, dto: ScreenApplicationDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id },
       select: { id: true, status: true },
     });
@@ -358,7 +351,7 @@ export class ApplicationsService {
 
     this.workflowsService.validateTransition(ApplicationStatus.SCREENING, toStatus);
 
-    const updated = await this.prisma.application.update({
+    const updated = await this.database.application.update({
       where: { id },
       data: { status: toStatus },
       include: this.defaultInclude(),
@@ -372,13 +365,24 @@ export class ApplicationsService {
       dto.reason,
     );
 
+    // When raising a query via the screen flow, persist the query in the DB
+    if (dto.action === ScreeningAction.RAISE_QUERY && dto.reason) {
+      await this.database.query.create({
+        data: {
+          applicationId: id,
+          raisedById: adminId,
+          question: dto.reason,
+        },
+      });
+    }
+
     return updated;
   }
 
   // ─── advanceStatus ───────────────────────────────────────────────────────────
 
   async advanceStatus(id: string, actorId: string, dto: AdvanceStatusDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id },
       select: { id: true, status: true },
     });
@@ -390,7 +394,7 @@ export class ApplicationsService {
     // This validates and throws if invalid
     this.workflowsService.validateTransition(application.status, dto.toStatus);
 
-    const updated = await this.prisma.application.update({
+    const updated = await this.database.application.update({
       where: { id },
       data: { status: dto.toStatus },
       include: this.defaultInclude(),

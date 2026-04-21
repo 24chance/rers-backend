@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { ApplicationStatus } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 
 /** Defines the allowed state machine transitions. */
 const ALLOWED_TRANSITIONS: Partial<Record<ApplicationStatus, ApplicationStatus[]>> = {
@@ -46,7 +46,7 @@ const ALLOWED_TRANSITIONS: Partial<Record<ApplicationStatus, ApplicationStatus[]
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── validateTransition ──────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ export class WorkflowsService {
   ) {
     this.validateTransition(from, to);
 
-    return this.prisma.workflowTransition.create({
+    return this.database.workflowTransition.create({
       data: {
         applicationId,
         fromStatus: from ?? undefined,
@@ -100,7 +100,7 @@ export class WorkflowsService {
   // ─── getTimeline ─────────────────────────────────────────────────────────────
 
   async getTimeline(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, referenceNumber: true, status: true },
     });
@@ -111,7 +111,7 @@ export class WorkflowsService {
       );
     }
 
-    const transitions = await this.prisma.workflowTransition.findMany({
+    const transitions = await this.database.workflowTransition.findMany({
       where: { applicationId },
       orderBy: { createdAt: 'asc' },
       include: {

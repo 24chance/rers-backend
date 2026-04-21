@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType, PrismaClient } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationType } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ export class NotificationsService {
     message: string,
     metadata?: Record<string, unknown>,
   ) {
-    return this.prisma.notification.create({
+    return this.database.notification.create({
       data: {
         userId,
         type,
@@ -34,14 +34,14 @@ export class NotificationsService {
   async findAll(userId: string, page = DEFAULT_PAGE, pageSize = DEFAULT_PAGE_SIZE) {
     const skip = (page - 1) * pageSize;
 
-    const [notifications, total] = await this.prisma.$transaction([
-      this.prisma.notification.findMany({
+    const [notifications, total] = await this.database.$transaction([
+      this.database.notification.findMany({
         where: { userId },
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.notification.count({ where: { userId } }),
+      this.database.notification.count({ where: { userId } }),
     ]);
 
     return {
@@ -58,7 +58,7 @@ export class NotificationsService {
   // ─── markRead ────────────────────────────────────────────────────────────────
 
   async markRead(id: string, userId: string) {
-    const notification = await this.prisma.notification.findUnique({
+    const notification = await this.database.notification.findUnique({
       where: { id },
       select: { id: true, userId: true },
     });
@@ -71,7 +71,7 @@ export class NotificationsService {
       throw new NotFoundException(`Notification "${id}" not found.`);
     }
 
-    return this.prisma.notification.update({
+    return this.database.notification.update({
       where: { id },
       data: { isRead: true },
     });
@@ -80,7 +80,7 @@ export class NotificationsService {
   // ─── markAllRead ─────────────────────────────────────────────────────────────
 
   async markAllRead(userId: string) {
-    return this.prisma.notification.updateMany({
+    return this.database.notification.updateMany({
       where: { userId, isRead: false },
       data: { isRead: true },
     });
@@ -89,7 +89,7 @@ export class NotificationsService {
   // ─── getUnreadCount ───────────────────────────────────────────────────────────
 
   async getUnreadCount(userId: string) {
-    const count = await this.prisma.notification.count({
+    const count = await this.database.notification.count({
       where: { userId, isRead: false },
     });
 
@@ -99,14 +99,14 @@ export class NotificationsService {
   // ─── send (static helper) ─────────────────────────────────────────────────────
 
   static async send(
-    prisma: PrismaClient | PrismaService,
+    database: DatabaseService,
     userId: string,
     type: NotificationType,
     title: string,
     message: string,
     metadata?: Record<string, unknown>,
   ) {
-    return (prisma as PrismaService).notification.create({
+    return database.notification.create({
       data: {
         userId,
         type,

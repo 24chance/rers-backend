@@ -8,7 +8,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SeverityLevel } from '@prisma/client';
+import { SeverityLevel } from '../../../common/enums';
 
 export class CreateAdverseEventDto {
   @ApiProperty({ description: 'Date the adverse event occurred', example: '2026-03-15' })

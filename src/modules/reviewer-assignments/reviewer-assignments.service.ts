@@ -4,19 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { NotificationType } from '@prisma/client';
+import { ApplicationStatus, NotificationType } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 
 @Injectable()
 export class ReviewerAssignmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── assign ──────────────────────────────────────────────────────────────────
 
   async assign(assignedById: string, dto: CreateAssignmentDto) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: dto.applicationId },
       select: { id: true, status: true, title: true },
     });
@@ -27,7 +26,7 @@ export class ReviewerAssignmentsService {
       );
     }
 
-    const reviewer = await this.prisma.user.findUnique({
+    const reviewer = await this.database.user.findUnique({
       where: { id: dto.reviewerId },
       select: { id: true, firstName: true, lastName: true, email: true },
     });
@@ -37,7 +36,7 @@ export class ReviewerAssignmentsService {
     }
 
     // Check for existing active assignment
-    const existing = await this.prisma.reviewAssignment.findFirst({
+    const existing = await this.database.reviewAssignment.findFirst({
       where: {
         applicationId: dto.applicationId,
         reviewerId: dto.reviewerId,
@@ -51,7 +50,7 @@ export class ReviewerAssignmentsService {
       );
     }
 
-    const assignment = await this.prisma.reviewAssignment.create({
+    const assignment = await this.database.reviewAssignment.create({
       data: {
         applicationId: dto.applicationId,
         reviewerId: dto.reviewerId,
@@ -72,12 +71,12 @@ export class ReviewerAssignmentsService {
       application.status !== ApplicationStatus.APPROVED &&
       application.status !== ApplicationStatus.CONDITIONALLY_APPROVED
     ) {
-      await this.prisma.application.update({
+      await this.database.application.update({
         where: { id: dto.applicationId },
         data: { status: ApplicationStatus.UNDER_REVIEW },
       });
 
-      await this.prisma.workflowTransition.create({
+      await this.database.workflowTransition.create({
         data: {
           applicationId: dto.applicationId,
           fromStatus: application.status,
@@ -89,7 +88,7 @@ export class ReviewerAssignmentsService {
     }
 
     // Notify reviewer
-    await this.prisma.notification.create({
+    await this.database.notification.create({
       data: {
         userId: dto.reviewerId,
         type: NotificationType.REVIEWER_ASSIGNED,
@@ -105,7 +104,7 @@ export class ReviewerAssignmentsService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -114,7 +113,7 @@ export class ReviewerAssignmentsService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    return this.prisma.reviewAssignment.findMany({
+    return this.database.reviewAssignment.findMany({
       where: { applicationId },
       include: {
         reviewer: {
@@ -133,7 +132,7 @@ export class ReviewerAssignmentsService {
   // ─── findByReviewer ──────────────────────────────────────────────────────────
 
   async findByReviewer(reviewerId: string) {
-    return this.prisma.reviewAssignment.findMany({
+    return this.database.reviewAssignment.findMany({
       where: { reviewerId },
       include: {
         application: {
@@ -157,7 +156,7 @@ export class ReviewerAssignmentsService {
     reviewerId: string,
     reason: string,
   ) {
-    const assignment = await this.prisma.reviewAssignment.findUnique({
+    const assignment = await this.database.reviewAssignment.findUnique({
       where: { id: assignmentId },
     });
 
@@ -177,7 +176,7 @@ export class ReviewerAssignmentsService {
       );
     }
 
-    return this.prisma.reviewAssignment.update({
+    return this.database.reviewAssignment.update({
       where: { id: assignmentId },
       data: {
         conflictDeclared: true,
@@ -190,7 +189,7 @@ export class ReviewerAssignmentsService {
   // ─── deactivate ───────────────────────────────────────────────────────────────
 
   async deactivate(assignmentId: string, adminId: string) {
-    const assignment = await this.prisma.reviewAssignment.findUnique({
+    const assignment = await this.database.reviewAssignment.findUnique({
       where: { id: assignmentId },
     });
 
@@ -202,7 +201,7 @@ export class ReviewerAssignmentsService {
       throw new BadRequestException('Assignment is already inactive.');
     }
 
-    return this.prisma.reviewAssignment.update({
+    return this.database.reviewAssignment.update({
       where: { id: assignmentId },
       data: { isActive: false },
     });

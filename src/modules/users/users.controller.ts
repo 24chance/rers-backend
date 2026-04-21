@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
@@ -34,6 +36,21 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // ─── POST /users ─────────────────────────────────────────────────────────────
+
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.IRB_ADMIN)
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a user (SYSTEM_ADMIN creates RNEC_ADMIN; IRB_ADMIN creates REVIEWER/FINANCE_OFFICER/CHAIRPERSON)',
+  })
+  @ApiResponse({ status: 201, description: 'User created.' })
+  @ApiResponse({ status: 403, description: 'Forbidden role assignment.' })
+  @ApiResponse({ status: 409, description: 'Email already exists.' })
+  create(@Body() dto: CreateUserDto, @CurrentUser() user: JwtPayload) {
+    return this.usersService.createUser(dto, user);
+  }
+
   // ─── GET /users ──────────────────────────────────────────────────────────────
 
   @Roles(UserRole.IRB_ADMIN, UserRole.RNEC_ADMIN, UserRole.SYSTEM_ADMIN)
@@ -44,11 +61,13 @@ export class UsersController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
   @ApiQuery({ name: 'tenantId', required: false, type: String })
+  @ApiQuery({ name: 'role', required: false, enum: UserRole })
   @ApiResponse({ status: 200, description: 'Paginated list of users.' })
   findAll(
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('tenantId') tenantId?: string,
+    @Query('role') role?: UserRole,
     @CurrentUser() user?: JwtPayload,
   ) {
     return this.usersService.findAll(
@@ -56,6 +75,7 @@ export class UsersController {
         page: page ? parseInt(page, 10) : undefined,
         pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
         tenantId,
+        role,
       },
       user!,
     );

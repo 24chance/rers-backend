@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
+import { UserRole } from '../../common/enums/user-role.enum';
+import { UserProvisioningService } from '../../common/user-provisioning/user-provisioning.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { QueryTenantDto } from './dto/query-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
@@ -14,12 +17,15 @@ const MAX_PAGE_SIZE = 100;
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly provisioning: UserProvisioningService,
+  ) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
   async create(dto: CreateTenantDto) {
-    const existing = await this.prisma.tenant.findUnique({
+    const existing = await this.database.tenant.findUnique({
       where: { code: dto.code },
     });
 
@@ -29,7 +35,27 @@ export class TenantsService {
       );
     }
 
-    return this.prisma.tenant.create({
+    const existingAdminUser = await this.database.user.findUnique({
+      where: { email: dto.admin.email },
+    });
+
+    if (existingAdminUser) {
+      throw new ConflictException(
+        `A user with email "${dto.admin.email}" already exists.`,
+      );
+    }
+
+    const irbAdminRole = await this.database.role.findUnique({
+      where: { name: UserRole.IRB_ADMIN },
+    });
+
+    if (!irbAdminRole) {
+      throw new BadRequestException(
+        'IRB_ADMIN role has not been seeded. Run /bootstrap/seed first.',
+      );
+    }
+
+    const tenant = await this.database.tenant.create({
       data: {
         name: dto.name,
         code: dto.code,
@@ -42,6 +68,17 @@ export class TenantsService {
         settings: dto.settings ?? undefined,
       },
     });
+
+    await this.provisioning.provision({
+      email: dto.admin.email,
+      firstName: dto.admin.firstName,
+      lastName: dto.admin.lastName,
+      phone: dto.admin.phone ?? null,
+      roleId: irbAdminRole.id,
+      tenantId: tenant.id,
+    });
+
+    return tenant;
   }
 
   // ─── findAll ─────────────────────────────────────────────────────────────────
@@ -67,8 +104,8 @@ export class TenantsService {
       where.name = { contains: query.search, mode: 'insensitive' };
     }
 
-    const [tenants, total] = await this.prisma.$transaction([
-      this.prisma.tenant.findMany({
+    const [tenants, total] = await this.database.$transaction([
+      this.database.tenant.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -79,7 +116,7 @@ export class TenantsService {
           },
         },
       }),
-      this.prisma.tenant.count({ where }),
+      this.database.tenant.count({ where }),
     ]);
 
     return {
@@ -96,7 +133,7 @@ export class TenantsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.database.tenant.findUnique({
       where: { id },
       include: {
         _count: {
@@ -117,7 +154,7 @@ export class TenantsService {
   async update(id: string, dto: UpdateTenantDto) {
     await this.findOne(id);
 
-    return this.prisma.tenant.update({
+    return this.database.tenant.update({
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
@@ -142,7 +179,7 @@ export class TenantsService {
   async remove(id: string) {
     await this.findOne(id);
 
-    await this.prisma.tenant.update({
+    await this.database.tenant.update({
       where: { id },
       data: { isActive: false },
     });
@@ -160,11 +197,11 @@ export class TenantsService {
       totalApplications,
       totalInstitutions,
       applicationsByStatus,
-    ] = await this.prisma.$transaction([
-      this.prisma.user.count({ where: { tenantId: id } }),
-      this.prisma.application.count({ where: { tenantId: id } }),
-      this.prisma.institution.count({ where: { tenantId: id } }),
-      this.prisma.application.groupBy({
+    ] = await this.database.$transaction([
+      this.database.user.count({ where: { tenantId: id } }),
+      this.database.application.count({ where: { tenantId: id } }),
+      this.database.institution.count({ where: { tenantId: id } }),
+      this.database.application.groupBy({
         by: ['status'],
         where: { tenantId: id },
         _count: { status: true },

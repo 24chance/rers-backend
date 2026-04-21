@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '../../../common/enums';
 import { IsEnum, IsInt, IsOptional, IsPositive } from 'class-validator';
 import { Type } from 'class-transformer';
 

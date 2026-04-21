@@ -1,10 +1,5 @@
 /**
- * UserRole enum — mirrors the Prisma schema UserRole enum.
- * This local definition is used for DTOs, guards, and decorators so they
- * compile before `prisma generate` has been run.
- *
- * After `prisma generate` the generated types can be used directly, but this
- * local definition ensures type-safety throughout the codebase regardless.
+ * UserRole enum shared across DTOs, guards, decorators, and database models.
  */
 export enum UserRole {
   APPLICANT = 'APPLICANT',

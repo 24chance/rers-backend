@@ -2,8 +2,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MonitoringStatus, MonitoringType } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { MonitoringStatus, MonitoringType } from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateAmendmentDto } from './dto/create-amendment.dto';
 import { CreateRenewalDto } from './dto/create-renewal.dto';
 import { CreateProgressReportDto } from './dto/create-progress-report.dto';
@@ -13,12 +13,12 @@ import { CreateClosureDto } from './dto/create-closure.dto';
 
 @Injectable()
 export class MonitoringService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── ensureApplicationExists ──────────────────────────────────────────────────
 
   private async ensureApplicationExists(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, status: true },
     });
@@ -39,7 +39,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.amendment.create({
+    return this.database.amendment.create({
       data: {
         applicationId,
         title: dto.title,
@@ -60,7 +60,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.renewal.create({
+    return this.database.renewal.create({
       data: {
         applicationId,
         justification: dto.justification,
@@ -80,7 +80,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.progressReport.create({
+    return this.database.progressReport.create({
       data: {
         applicationId,
         reportPeriod: dto.reportPeriod,
@@ -102,7 +102,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.adverseEvent.create({
+    return this.database.adverseEvent.create({
       data: {
         applicationId,
         eventDate: new Date(dto.eventDate),
@@ -125,7 +125,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.protocolDeviation.create({
+    return this.database.protocolDeviation.create({
       data: {
         applicationId,
         deviationDate: new Date(dto.deviationDate),
@@ -147,7 +147,7 @@ export class MonitoringService {
   ) {
     await this.ensureApplicationExists(applicationId);
 
-    return this.prisma.closureReport.create({
+    return this.database.closureReport.create({
       data: {
         applicationId,
         closureDate: new Date(dto.closureDate),
@@ -167,37 +167,37 @@ export class MonitoringService {
 
     switch (type) {
       case MonitoringType.AMENDMENT:
-        return this.prisma.amendment.findMany({
+        return this.database.amendment.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });
 
       case MonitoringType.RENEWAL:
-        return this.prisma.renewal.findMany({
+        return this.database.renewal.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });
 
       case MonitoringType.PROGRESS_REPORT:
-        return this.prisma.progressReport.findMany({
+        return this.database.progressReport.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });
 
       case MonitoringType.ADVERSE_EVENT:
-        return this.prisma.adverseEvent.findMany({
+        return this.database.adverseEvent.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });
 
       case MonitoringType.PROTOCOL_DEVIATION:
-        return this.prisma.protocolDeviation.findMany({
+        return this.database.protocolDeviation.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });
 
       case MonitoringType.CLOSURE_REPORT:
-        return this.prisma.closureReport.findMany({
+        return this.database.closureReport.findMany({
           where: { applicationId },
           orderBy: { createdAt: 'desc' },
         });

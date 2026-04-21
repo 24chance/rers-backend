@@ -26,7 +26,7 @@ interface ErrorResponse {
  * {
  *   "statusCode": 400,
  *   "message": "Validation failed",
- *   "errors": ["email must be an email", "password must be longer than 8 chars"],
+ *   "errors": ["email must be an email", "password must be longer than 6 chars"],
  *   "path": "/api/v1/auth/register",
  *   "timestamp": "2024-01-01T00:00:00.000Z"
  * }

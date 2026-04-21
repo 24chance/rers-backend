@@ -4,17 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── startReview ─────────────────────────────────────────────────────────────
 
   async startReview(applicationId: string, reviewerId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, status: true },
     });
@@ -24,7 +24,7 @@ export class ReviewsService {
     }
 
     // Verify reviewer has an active assignment for this application
-    const assignment = await this.prisma.reviewAssignment.findFirst({
+    const assignment = await this.database.reviewAssignment.findFirst({
       where: {
         applicationId,
         reviewerId,
@@ -40,7 +40,7 @@ export class ReviewsService {
     }
 
     // Check if review already exists
-    const existing = await this.prisma.review.findFirst({
+    const existing = await this.database.review.findFirst({
       where: { applicationId, reviewerId },
     });
 
@@ -50,7 +50,7 @@ export class ReviewsService {
       );
     }
 
-    return this.prisma.review.create({
+    return this.database.review.create({
       data: {
         applicationId,
         reviewerId,
@@ -66,7 +66,7 @@ export class ReviewsService {
     reviewerId: string,
     dto: SubmitReviewDto,
   ) {
-    const review = await this.prisma.review.findUnique({
+    const review = await this.database.review.findUnique({
       where: { id: reviewId },
     });
 
@@ -82,7 +82,7 @@ export class ReviewsService {
       throw new BadRequestException('This review has already been submitted.');
     }
 
-    return this.prisma.review.update({
+    return this.database.review.update({
       where: { id: reviewId },
       data: {
         comments: dto.comments,
@@ -98,7 +98,7 @@ export class ReviewsService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -107,7 +107,7 @@ export class ReviewsService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    return this.prisma.review.findMany({
+    return this.database.review.findMany({
       where: { applicationId },
       include: this.defaultInclude(),
       orderBy: { createdAt: 'desc' },
@@ -117,7 +117,7 @@ export class ReviewsService {
   // ─── findByReviewer ──────────────────────────────────────────────────────────
 
   async findByReviewer(reviewerId: string) {
-    return this.prisma.review.findMany({
+    return this.database.review.findMany({
       where: { reviewerId },
       include: {
         application: {
@@ -137,7 +137,7 @@ export class ReviewsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string, reviewerId: string) {
-    const review = await this.prisma.review.findUnique({
+    const review = await this.database.review.findUnique({
       where: { id },
       include: this.defaultInclude(),
     });

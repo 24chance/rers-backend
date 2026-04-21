@@ -2,18 +2,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 @Injectable()
 export class ReceiptsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
   async create(paymentId: string, amount: number) {
     const receiptNumber = await this.generateReceiptNumber();
 
-    return this.prisma.receipt.create({
+    return this.database.receipt.create({
       data: {
         paymentId,
         receiptNumber,
@@ -37,7 +37,7 @@ export class ReceiptsService {
   // ─── findByPayment ────────────────────────────────────────────────────────────
 
   async findByPayment(paymentId: string) {
-    const payment = await this.prisma.payment.findUnique({
+    const payment = await this.database.payment.findUnique({
       where: { id: paymentId },
       select: { id: true },
     });
@@ -46,7 +46,7 @@ export class ReceiptsService {
       throw new NotFoundException(`Payment "${paymentId}" not found.`);
     }
 
-    return this.prisma.receipt.findFirst({
+    return this.database.receipt.findFirst({
       where: { paymentId },
       include: {
         payment: {
@@ -65,7 +65,7 @@ export class ReceiptsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const receipt = await this.prisma.receipt.findUnique({
+    const receipt = await this.database.receipt.findUnique({
       where: { id },
       include: {
         payment: {
@@ -105,7 +105,7 @@ export class ReceiptsService {
       where.paymentId = filters.paymentId;
     }
 
-    return this.prisma.receipt.findMany({
+    return this.database.receipt.findMany({
       where,
       include: {
         payment: {
@@ -128,7 +128,7 @@ export class ReceiptsService {
     const year = new Date().getFullYear();
     const prefix = `RCPT-${year}-`;
 
-    const count = await this.prisma.receipt.count({
+    const count = await this.database.receipt.count({
       where: { receiptNumber: { startsWith: prefix } },
     });
 

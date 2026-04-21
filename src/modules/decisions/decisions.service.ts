@@ -2,15 +2,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, DecisionType, NotificationType } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import {
+  ApplicationStatus,
+  DecisionType,
+  NotificationType,
+} from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateDecisionDto } from './dto/create-decision.dto';
 import { CertificatesService } from '../certificates/certificates.service';
 
 @Injectable()
 export class DecisionsService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly database: DatabaseService,
     private readonly certificatesService: CertificatesService,
   ) {}
 
@@ -21,7 +25,7 @@ export class DecisionsService {
     actorId: string,
     dto: CreateDecisionDto,
   ) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, status: true, title: true, applicantId: true },
     });
@@ -40,7 +44,7 @@ export class DecisionsService {
 
     const newStatus = statusMap[dto.type];
 
-    const decision = await this.prisma.decision.create({
+    const decision = await this.database.decision.create({
       data: {
         applicationId,
         type: dto.type,
@@ -56,13 +60,13 @@ export class DecisionsService {
     });
 
     // Update application status
-    await this.prisma.application.update({
+    await this.database.application.update({
       where: { id: applicationId },
       data: { status: newStatus },
     });
 
     // Record workflow transition
-    await this.prisma.workflowTransition.create({
+    await this.database.workflowTransition.create({
       data: {
         applicationId,
         fromStatus: application.status,
@@ -74,7 +78,7 @@ export class DecisionsService {
     });
 
     // Notify applicant
-    await this.prisma.notification.create({
+    await this.database.notification.create({
       data: {
         userId: application.applicantId,
         type: NotificationType.DECISION_ISSUED,
@@ -89,7 +93,7 @@ export class DecisionsService {
       await this.certificatesService.generate(applicationId, decision.id);
 
       // Notify applicant about certificate
-      await this.prisma.notification.create({
+      await this.database.notification.create({
         data: {
           userId: application.applicantId,
           type: NotificationType.CERTIFICATE_AVAILABLE,
@@ -106,7 +110,7 @@ export class DecisionsService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -115,7 +119,7 @@ export class DecisionsService {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
     }
 
-    return this.prisma.decision.findMany({
+    return this.database.decision.findMany({
       where: { applicationId },
       include: {
         certificate: true,
@@ -127,7 +131,7 @@ export class DecisionsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const decision = await this.prisma.decision.findUnique({
+    const decision = await this.database.decision.findUnique({
       where: { id },
       include: {
         application: {

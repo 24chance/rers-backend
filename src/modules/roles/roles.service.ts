@@ -3,17 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { AssignPermissionDto } from './dto/assign-permission.dto';
 
 @Injectable()
 export class RolesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ─── findAll ─────────────────────────────────────────────────────────────────
 
   async findAll() {
-    return this.prisma.role.findMany({
+    return this.database.role.findMany({
       include: {
         permissions: {
           include: {
@@ -29,7 +29,7 @@ export class RolesService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string) {
-    const role = await this.prisma.role.findUnique({
+    const role = await this.database.role.findUnique({
       where: { id },
       include: {
         permissions: {
@@ -53,7 +53,7 @@ export class RolesService {
   async assignPermission(roleId: string, dto: AssignPermissionDto) {
     await this.findOne(roleId);
 
-    const permission = await this.prisma.permission.findUnique({
+    const permission = await this.database.permission.findUnique({
       where: { id: dto.permissionId },
     });
 
@@ -63,7 +63,7 @@ export class RolesService {
       );
     }
 
-    const existing = await this.prisma.rolePermission.findUnique({
+    const existing = await this.database.rolePermission.findUnique({
       where: {
         roleId_permissionId: { roleId, permissionId: dto.permissionId },
       },
@@ -75,7 +75,7 @@ export class RolesService {
       );
     }
 
-    await this.prisma.rolePermission.create({
+    await this.database.rolePermission.create({
       data: { roleId, permissionId: dto.permissionId },
     });
 
@@ -87,7 +87,7 @@ export class RolesService {
   async removePermission(roleId: string, permId: string) {
     await this.findOne(roleId);
 
-    const existing = await this.prisma.rolePermission.findUnique({
+    const existing = await this.database.rolePermission.findUnique({
       where: { roleId_permissionId: { roleId, permissionId: permId } },
     });
 
@@ -97,7 +97,7 @@ export class RolesService {
       );
     }
 
-    await this.prisma.rolePermission.delete({
+    await this.database.rolePermission.delete({
       where: { roleId_permissionId: { roleId, permissionId: permId } },
     });
 

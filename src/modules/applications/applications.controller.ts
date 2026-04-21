@@ -17,7 +17,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -48,7 +49,7 @@ export class ApplicationsController {
     @Body() dto: CreateApplicationDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.applicationsService.create(user.id, dto);
+    return this.applicationsService.create(user.id, user.tenantId ?? null, dto);
   }
 
   // ─── GET /applications ────────────────────────────────────────────────────────

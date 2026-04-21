@@ -4,9 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { join } from 'path';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { CloudinaryService } from '../../common/cloudinary/cloudinary.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+
+export interface MulterMemoryFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 /** MIME types allowed for upload. */
 const ALLOWED_MIME_TYPES = new Set([
@@ -19,12 +28,15 @@ const ALLOWED_MIME_TYPES = new Set([
 
 @Injectable()
 export class ApplicationDocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   // ─── uploadDocument ───────────────────────────────────────────────────────────
 
   async uploadDocument(
-    file: Express.Multer.File,
+    file: MulterMemoryFile,
     applicationId: string,
     dto: UploadDocumentDto,
     userId: string,
@@ -35,7 +47,7 @@ export class ApplicationDocumentsService {
       );
     }
 
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true, applicantId: true },
     });
@@ -46,14 +58,20 @@ export class ApplicationDocumentsService {
       );
     }
 
-    const document = await this.prisma.applicationDocument.create({
+    const { url, publicId } = await this.cloudinary.upload(file.buffer, {
+      folder: `rers/applications/${applicationId}`,
+      originalName: file.originalname,
+    });
+
+    const document = await this.database.applicationDocument.create({
       data: {
         applicationId,
-        fileName: file.filename,
+        fileName: file.originalname,
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        path: file.path,
+        path: url,
+        cloudinaryPublicId: publicId,
         documentType: dto.documentType,
         version: dto.version ?? 1,
         uploadedById: userId,
@@ -66,7 +84,7 @@ export class ApplicationDocumentsService {
   // ─── findByApplication ────────────────────────────────────────────────────────
 
   async findByApplication(applicationId: string) {
-    const application = await this.prisma.application.findUnique({
+    const application = await this.database.application.findUnique({
       where: { id: applicationId },
       select: { id: true },
     });
@@ -77,7 +95,7 @@ export class ApplicationDocumentsService {
       );
     }
 
-    return this.prisma.applicationDocument.findMany({
+    return this.database.applicationDocument.findMany({
       where: { applicationId },
       orderBy: { createdAt: 'desc' },
     });
@@ -86,7 +104,7 @@ export class ApplicationDocumentsService {
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(applicationId: string, docId: string) {
-    const document = await this.prisma.applicationDocument.findFirst({
+    const document = await this.database.applicationDocument.findFirst({
       where: { id: docId, applicationId },
     });
 
@@ -108,28 +126,27 @@ export class ApplicationDocumentsService {
   ) {
     const document = await this.findOne(applicationId, docId);
 
-    // Only the uploader or an admin (no role check here — controller handles @Roles)
     if (document.uploadedById && document.uploadedById !== userId) {
       throw new ForbiddenException(
         'You can only delete documents you uploaded.',
       );
     }
 
-    await this.prisma.applicationDocument.delete({ where: { id: docId } });
+    // Delete from Cloudinary if we have the public_id
+    if (document.cloudinaryPublicId) {
+      const resourceType = document.mimeType.startsWith('image/') ? 'image' : 'raw';
+      await this.cloudinary.delete(document.cloudinaryPublicId, resourceType);
+    }
+
+    await this.database.applicationDocument.delete({ where: { id: docId } });
 
     return { message: `Document "${docId}" deleted.` };
   }
 
-  // ─── getDownloadPath ──────────────────────────────────────────────────────────
+  // ─── getUrl ──────────────────────────────────────────────────────────────────
 
-  async getDownloadPath(
-    applicationId: string,
-    docId: string,
-    _userId: string,
-  ): Promise<string> {
+  async getUrl(applicationId: string, docId: string): Promise<string> {
     const document = await this.findOne(applicationId, docId);
-
-    // Return the absolute path so the controller can use sendFile / res.download
-    return join(process.cwd(), document.path);
+    return document.path; // path now stores the Cloudinary secure URL
   }
 }

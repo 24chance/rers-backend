@@ -3,8 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, NotificationType, PaymentStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import {
+  ApplicationStatus,
+  NotificationType,
+  PaymentStatus,
+} from '../../common/enums';
+import { DatabaseService } from '../../common/database/database.service';
 import { ReceiptsService } from '../receipts/receipts.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
@@ -12,14 +16,14 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto';
 @Injectable()
 export class PaymentsService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly database: DatabaseService,
     private readonly receiptsService: ReceiptsService,
   ) {}
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
   async create(invoiceId: string, dto: CreatePaymentDto) {
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.database.invoice.findUnique({
       where: { id: invoiceId },
       select: { id: true, status: true, applicationId: true, amount: true },
     });
@@ -32,7 +36,7 @@ export class PaymentsService {
       throw new BadRequestException('This invoice has already been paid and verified.');
     }
 
-    return this.prisma.payment.create({
+    return this.database.payment.create({
       data: {
         invoiceId,
         amount: dto.amount,
@@ -52,7 +56,7 @@ export class PaymentsService {
   // ─── verify ──────────────────────────────────────────────────────────────────
 
   async verify(paymentId: string, officerId: string, dto: VerifyPaymentDto) {
-    const payment = await this.prisma.payment.findUnique({
+    const payment = await this.database.payment.findUnique({
       where: { id: paymentId },
       include: {
         invoice: {
@@ -81,7 +85,7 @@ export class PaymentsService {
     }
 
     // Update payment
-    const updatedPayment = await this.prisma.payment.update({
+    const updatedPayment = await this.database.payment.update({
       where: { id: paymentId },
       data: {
         status: PaymentStatus.VERIFIED,
@@ -92,7 +96,7 @@ export class PaymentsService {
     });
 
     // Update invoice status
-    await this.prisma.invoice.update({
+    await this.database.invoice.update({
       where: { id: payment.invoiceId },
       data: { status: PaymentStatus.VERIFIED },
     });
@@ -100,12 +104,12 @@ export class PaymentsService {
     const application = payment.invoice.application;
 
     // Update application status to PAYMENT_VERIFIED
-    await this.prisma.application.update({
+    await this.database.application.update({
       where: { id: application.id },
       data: { status: ApplicationStatus.PAYMENT_VERIFIED },
     });
 
-    await this.prisma.workflowTransition.create({
+    await this.database.workflowTransition.create({
       data: {
         applicationId: application.id,
         fromStatus: application.status,
@@ -116,7 +120,7 @@ export class PaymentsService {
     });
 
     // Notify applicant
-    await this.prisma.notification.create({
+    await this.database.notification.create({
       data: {
         userId: application.applicantId,
         type: NotificationType.PAYMENT_VERIFIED,
@@ -138,7 +142,7 @@ export class PaymentsService {
   // ─── findByInvoice ────────────────────────────────────────────────────────────
 
   async findByInvoice(invoiceId: string) {
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.database.invoice.findUnique({
       where: { id: invoiceId },
       select: { id: true },
     });
@@ -147,7 +151,7 @@ export class PaymentsService {
       throw new NotFoundException(`Invoice "${invoiceId}" not found.`);
     }
 
-    return this.prisma.payment.findMany({
+    return this.database.payment.findMany({
       where: { invoiceId },
       include: {
         receipts: { select: { id: true, receiptNumber: true, issuedAt: true } },

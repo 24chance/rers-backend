@@ -9,10 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 /**
- * Minimal shape of a User record returned by Prisma.
- * Replaced by the generated `User` type once `prisma generate` is run.
+ * Minimal shape of an authenticated user record returned from the database.
  */
-interface PrismaUser {
+interface AuthUserRecord {
   id: string;
   email: string;
   passwordHash: string;
@@ -21,6 +20,7 @@ interface PrismaUser {
   phone: string | null;
   isActive: boolean;
   isVerified: boolean;
+  firstLogin: boolean;
   otpCode: string | null;
   otpExpiresAt: Date | null;
   resetToken: string | null;
@@ -33,7 +33,8 @@ interface PrismaUser {
 }
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
+import { EmailService } from '../../common/email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -51,11 +52,28 @@ interface JwtTokenPayload {
   tenantId: string | null;
 }
 
+export interface SanitizedUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  isActive: boolean;
+  isVerified: boolean;
+  firstLogin: boolean;
+  lastLoginAt: Date | null;
+  tenantId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  role: { id: string; name: string };
+}
+
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly database: DatabaseService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -86,8 +104,8 @@ export class AuthService {
    * Used by LocalStrategy to verify credentials without issuing a token.
    * Returns the User record on success, null on failure.
    */
-  async validateUser(email: string, password: string): Promise<PrismaUser | null> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async validateUser(email: string, password: string): Promise<AuthUserRecord | null> {
+    const user = await this.database.user.findUnique({ where: { email } });
     if (!user) return null;
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
@@ -98,8 +116,8 @@ export class AuthService {
 
   // ─── register ────────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterDto): Promise<{ message: string; otp: string }> {
-    const existing = await this.prisma.user.findUnique({
+  async register(dto: RegisterDto): Promise<{ message: string }> {
+    const existing = await this.database.user.findUnique({
       where: { email: dto.email },
     });
 
@@ -107,9 +125,9 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists.');
     }
 
-    const targetRoleName: UserRole = dto.role ?? UserRole.APPLICANT;
+    const targetRoleName: UserRole = UserRole.APPLICANT;
 
-    const role = await this.prisma.role.findUnique({
+    const role = await this.database.role.findUnique({
       where: { name: targetRoleName },
     });
 
@@ -122,7 +140,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const otp = this.generateOtp();
 
-    await this.prisma.user.create({
+    await this.database.user.create({
       data: {
         email: dto.email,
         passwordHash,
@@ -132,23 +150,23 @@ export class AuthService {
         roleId: role.id,
         isActive: true,
         isVerified: false,
+        firstLogin: false,
         otpCode: otp,
         otpExpiresAt: this.otpExpiresAt(),
       },
     });
 
-    // In production, send `otp` via email/SMS. Returning it here for
-    // development / testing purposes only.
+    await this.emailService.sendOtp(dto.email, otp);
+
     return {
-      message: 'Registration successful. Please verify your account with the OTP.',
-      otp,
+      message: 'Registration successful. Please check your email for the verification code.',
     };
   }
 
   // ─── login ───────────────────────────────────────────────────────────────────
 
-  async login(dto: LoginDto): Promise<{ accessToken: string }> {
-    const user = await this.prisma.user.findUnique({
+  async login(dto: LoginDto): Promise<{ accessToken: string; user: SanitizedUser }> {
+    const user = await this.database.user.findUnique({
       where: { email: dto.email },
       include: { role: true },
     });
@@ -172,7 +190,7 @@ export class AuthService {
       );
     }
 
-    await this.prisma.user.update({
+    await this.database.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
@@ -184,13 +202,32 @@ export class AuthService {
       tenantId: user.tenantId ?? null,
     };
 
-    return { accessToken: this.signToken(payload) };
+    const sanitizeUser = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      isActive: user.isActive,
+      isVerified: user.isVerified,
+      firstLogin: user.firstLogin,
+      lastLoginAt: user.lastLoginAt,
+      tenantId: user.tenantId,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      role: {
+        id: user.role.id,
+        name: user.role.name,
+      },
+    };
+
+    return { accessToken: this.signToken(payload), user: sanitizeUser };
   }
 
   // ─── verifyOtp ───────────────────────────────────────────────────────────────
 
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.database.user.findUnique({
       where: { email: dto.email },
     });
 
@@ -206,7 +243,7 @@ export class AuthService {
       throw new BadRequestException('OTP has expired. Please request a new one.');
     }
 
-    await this.prisma.user.update({
+    await this.database.user.update({
       where: { id: user.id },
       data: {
         isVerified: true,
@@ -222,23 +259,20 @@ export class AuthService {
 
   async forgotPassword(
     dto: ForgotPasswordDto,
-  ): Promise<{ message: string; resetToken: string }> {
-    const user = await this.prisma.user.findUnique({
+  ): Promise<{ message: string }> {
+    const SAFE_MESSAGE = 'If an account with that email exists, a reset link has been sent.';
+
+    const user = await this.database.user.findUnique({
       where: { email: dto.email },
     });
 
-    // Avoid leaking whether an account exists
     if (!user) {
-      return {
-        message:
-          'If an account with that email exists, a reset link has been sent.',
-        resetToken: '',
-      };
+      return { message: SAFE_MESSAGE };
     }
 
     const resetToken = uuidv4();
 
-    await this.prisma.user.update({
+    await this.database.user.update({
       where: { id: user.id },
       data: {
         resetToken,
@@ -246,18 +280,15 @@ export class AuthService {
       },
     });
 
-    // In production, email the resetToken to the user.
-    return {
-      message:
-        'If an account with that email exists, a reset link has been sent.',
-      resetToken,
-    };
+    await this.emailService.sendPasswordReset(dto.email, resetToken);
+
+    return { message: SAFE_MESSAGE };
   }
 
   // ─── resetPassword ───────────────────────────────────────────────────────────
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.database.user.findFirst({
       where: { resetToken: dto.token },
     });
 
@@ -271,9 +302,9 @@ export class AuthService {
       );
     }
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
-    await this.prisma.user.update({
+    await this.database.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
@@ -288,7 +319,7 @@ export class AuthService {
   // ─── getMe ───────────────────────────────────────────────────────────────────
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.database.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -298,6 +329,7 @@ export class AuthService {
         phone: true,
         isActive: true,
         isVerified: true,
+        firstLogin: true,
         lastLoginAt: true,
         tenantId: true,
         createdAt: true,
@@ -317,5 +349,44 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  // ─── changePassword ──────────────────────────────────────────────────────────
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.database.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await this.database.user.update({
+      where: { id: userId },
+      data: { passwordHash, firstLogin: false },
+    });
+
+    return { message: 'Password changed successfully.' };
+  }
+
+  // ─── skipFirstLogin ──────────────────────────────────────────────────────────
+
+  async skipFirstLogin(userId: string): Promise<{ message: string }> {
+    await this.database.user.update({
+      where: { id: userId },
+      data: { firstLogin: false },
+    });
+
+    return { message: 'First login acknowledged.' };
   }
 }
