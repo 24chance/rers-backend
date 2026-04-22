@@ -17,6 +17,11 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const TENANT_SCOPED_ROLES = new Set<UserRole>([
+  UserRole.IRB_ADMIN,
+  UserRole.CHAIRPERSON,
+  UserRole.FINANCE_OFFICER,
+]);
 
 @Injectable()
 export class ApplicationsService {
@@ -103,10 +108,10 @@ export class ApplicationsService {
     // Role-scoped filtering
     if (role === UserRole.APPLICANT) {
       where.applicantId = userId;
-    } else if (role === UserRole.IRB_ADMIN) {
+    } else if (TENANT_SCOPED_ROLES.has(role)) {
       where.tenantId = userTenantId ?? undefined;
     }
-    // RNEC_ADMIN and SYSTEM_ADMIN see all — no tenant restriction
+    // RNEC_ADMIN and SYSTEM_ADMIN see all unless an explicit tenant filter is applied
 
     if (filters.status) {
       where.status = filters.status;
@@ -182,9 +187,7 @@ export class ApplicationsService {
       throw new ForbiddenException('You do not have access to this application.');
     }
 
-    if (
-      role === UserRole.IRB_ADMIN
-    ) {
+    if (TENANT_SCOPED_ROLES.has(role)) {
       const user = await this.database.user.findUnique({
         where: { id: userId },
         select: { tenantId: true },
@@ -410,6 +413,35 @@ export class ApplicationsService {
     );
 
     return updated;
+  }
+
+  // ─── remove ──────────────────────────────────────────────────────────────────
+
+  async remove(id: string, userId: string) {
+    const application = await this.database.application.findUnique({
+      where: { id },
+      select: { id: true, status: true, applicantId: true },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application with id "${id}" not found.`);
+    }
+
+    if (application.applicantId !== userId) {
+      throw new ForbiddenException('You can only delete your own applications.');
+    }
+
+    if (application.status !== ApplicationStatus.DRAFT) {
+      throw new BadRequestException(
+        `Only DRAFT applications can be deleted. Current status: "${application.status}".`,
+      );
+    }
+
+    // Delete child records first (no cascade configured on the entity)
+    await this.database.applicationDocument.deleteMany({ where: { applicationId: id } });
+    await this.database.workflowTransition.deleteMany({ where: { applicationId: id } });
+
+    await this.database.application.delete({ where: { id } });
   }
 
   // ─── getTimeline ─────────────────────────────────────────────────────────────

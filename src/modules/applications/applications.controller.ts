@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -100,6 +101,20 @@ export class ApplicationsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.applicationsService.update(id, user.id, dto);
+  }
+
+  // ─── DELETE /applications/:id ────────────────────────────────────────────────
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a DRAFT application (applicant only)' })
+  @ApiParam({ name: 'id', description: 'Application UUID' })
+  @ApiResponse({ status: 204, description: 'Application deleted.' })
+  @ApiResponse({ status: 400, description: 'Application is not in DRAFT status.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Application not found.' })
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.applicationsService.remove(id, user.id);
   }
 
   // ─── POST /applications/:id/submit ────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -6,6 +7,7 @@ import {
   ApplicationStatus,
   DecisionType,
   NotificationType,
+  UserRole,
 } from '../../common/enums';
 import { DatabaseService } from '../../common/database/database.service';
 import { CreateDecisionDto } from './dto/create-decision.dto';
@@ -27,11 +29,29 @@ export class DecisionsService {
   ) {
     const application = await this.database.application.findUnique({
       where: { id: applicationId },
-      select: { id: true, status: true, title: true, applicantId: true },
+      select: { id: true, status: true, title: true, applicantId: true, tenantId: true },
     });
 
     if (!application) {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
+    }
+
+    const actor = await this.database.user.findUnique({
+      where: { id: actorId },
+      select: { id: true, role: true, tenantId: true },
+    });
+
+    if (!actor) {
+      throw new NotFoundException(`User "${actorId}" not found.`);
+    }
+
+    if (
+      (actor.role === UserRole.IRB_ADMIN || actor.role === UserRole.CHAIRPERSON)
+      && application.tenantId !== actor.tenantId
+    ) {
+      throw new ForbiddenException(
+        'You can only record decisions for applications in your tenant.',
+      );
     }
 
     // Map decision type to application status

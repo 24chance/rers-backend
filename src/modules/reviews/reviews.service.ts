@@ -11,6 +11,63 @@ import { SubmitReviewDto } from './dto/submit-review.dto';
 export class ReviewsService {
   constructor(private readonly database: DatabaseService) {}
 
+  private async findReviewById(id: string) {
+    return this.database.review.findUnique({
+      where: { id },
+      include: this.defaultInclude(),
+    });
+  }
+
+  private async openReviewFromAssignmentId(
+    assignmentId: string,
+    reviewerId: string,
+    missingEntityLabel: 'Review' | 'Assignment' = 'Review',
+  ) {
+    const assignment = await this.database.reviewAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException(
+        `${missingEntityLabel} "${assignmentId}" not found.`,
+      );
+    }
+
+    if (assignment.reviewerId !== reviewerId) {
+      throw new ForbiddenException('You do not have access to this review.');
+    }
+
+    const existingReview = await this.database.review.findFirst({
+      where: {
+        applicationId: assignment.applicationId,
+        reviewerId: assignment.reviewerId,
+      },
+      include: this.defaultInclude(),
+    });
+
+    if (existingReview) {
+      return existingReview;
+    }
+
+    if (!assignment.isActive) {
+      throw new BadRequestException('This assignment is no longer active.');
+    }
+
+    if (assignment.conflictDeclared) {
+      throw new BadRequestException(
+        'You cannot open a review for an assignment with a declared conflict.',
+      );
+    }
+
+    return this.database.review.create({
+      data: {
+        applicationId: assignment.applicationId,
+        reviewerId: assignment.reviewerId,
+      },
+      include: this.defaultInclude(),
+    });
+  }
+
   // ─── startReview ─────────────────────────────────────────────────────────────
 
   async startReview(applicationId: string, reviewerId: string) {
@@ -59,6 +116,14 @@ export class ReviewsService {
     });
   }
 
+  async openReviewForAssignment(assignmentId: string, reviewerId: string) {
+    return this.openReviewFromAssignmentId(
+      assignmentId,
+      reviewerId,
+      'Assignment',
+    );
+  }
+
   // ─── submitReview ────────────────────────────────────────────────────────────
 
   async submitReview(
@@ -66,13 +131,13 @@ export class ReviewsService {
     reviewerId: string,
     dto: SubmitReviewDto,
   ) {
-    const review = await this.database.review.findUnique({
+    const directReview = await this.database.review.findUnique({
       where: { id: reviewId },
     });
 
-    if (!review) {
-      throw new NotFoundException(`Review "${reviewId}" not found.`);
-    }
+    const review =
+      directReview ??
+      (await this.openReviewFromAssignmentId(reviewId, reviewerId));
 
     if (review.reviewerId !== reviewerId) {
       throw new ForbiddenException('You can only submit your own reviews.');
@@ -83,7 +148,7 @@ export class ReviewsService {
     }
 
     return this.database.review.update({
-      where: { id: reviewId },
+      where: { id: review.id },
       data: {
         comments: dto.comments,
         recommendation: dto.recommendation,
@@ -134,23 +199,41 @@ export class ReviewsService {
     });
   }
 
+  async findAssignmentsForReviewer(reviewerId: string) {
+    return this.database.reviewAssignment.findMany({
+      where: {
+        reviewerId,
+        isActive: true,
+      },
+      include: {
+        application: {
+          select: {
+            id: true,
+            referenceNumber: true,
+            title: true,
+            type: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   // ─── findOne ─────────────────────────────────────────────────────────────────
 
   async findOne(id: string, reviewerId: string) {
-    const review = await this.database.review.findUnique({
-      where: { id },
-      include: this.defaultInclude(),
-    });
+    const review = await this.findReviewById(id);
 
-    if (!review) {
-      throw new NotFoundException(`Review "${id}" not found.`);
+    if (review) {
+      if (review.reviewerId !== reviewerId) {
+        throw new ForbiddenException('You do not have access to this review.');
+      }
+
+      return review;
     }
 
-    if (review.reviewerId !== reviewerId) {
-      throw new ForbiddenException('You do not have access to this review.');
-    }
-
-    return review;
+    return this.openReviewFromAssignmentId(id, reviewerId);
   }
 
   // ─── defaultInclude ──────────────────────────────────────────────────────────

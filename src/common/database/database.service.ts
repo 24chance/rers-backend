@@ -215,6 +215,12 @@ class ModelAdapter {
     return this.transform(current, {});
   }
 
+  async deleteMany(options: DatabaseDeleteOptions): Promise<{ count: number }> {
+    const where = this.buildWhere(options.where);
+    const result = await this.repository.delete(where ?? {});
+    return { count: result.affected ?? 0 };
+  }
+
   async updateMany(options: DatabaseUpdateOptions): Promise<{ count: number }> {
     const records = await this.repository.find({
       where: this.buildWhere(options.where),
