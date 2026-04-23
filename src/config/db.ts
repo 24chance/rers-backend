@@ -26,11 +26,7 @@ export const createDatabaseOptions = (): DataSourceOptions => {
     extra: {
       connectionTimeoutMillis: 30000,
     },
-    ssl: isProduction
-      ? false
-      : requiresSSL(databaseUrl)
-        ? { rejectUnauthorized: false }
-        : false,
+    ssl: requiresSSL(databaseUrl) ? { rejectUnauthorized: false } : false,
     schema: 'public',
   };
 };
