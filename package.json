@@ -9,7 +9,7 @@
     "build": "tsc",
     "dev": "nodemon",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "NODE_ENV=production node dist/src/main.js",
     "start:dev": "nodemon",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",

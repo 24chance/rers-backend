@@ -1,3 +1,4 @@
+import { ApplicationStatus } from '../../common/enums';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { DatabaseService } from '../../common/database/database.service';
 export declare class DashboardsService {
@@ -10,17 +11,46 @@ export declare class DashboardsService {
         approvedApplications: number;
         recentApplications: any[];
     } | {
-        totalSubmissions: number;
+        totalApplications: number;
         pendingScreening: number;
-        pendingReview: number;
+        underReview: number;
         approved: number;
+        conditionallyApproved: number;
         rejected: number;
         paymentPending: number;
         activeMonitoring: number;
+        applicationsByStatus: {
+            status: ApplicationStatus;
+            count: number;
+        }[];
+        recentActivity: {
+            applicationId: any;
+            referenceNumber: any;
+            action: string;
+            actorName: string;
+            createdAt: string;
+        }[];
         reviewerWorkload: {
             reviewerId: any;
             name: string;
             assignedCount: any;
+        }[];
+    } | {
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
+            total: number;
+            approved: number;
+            pending: number;
+            rejected: number;
         }[];
     }>;
     getApplicantDashboard(userId: string): Promise<{
@@ -39,32 +69,34 @@ export declare class DashboardsService {
             applicationId: any;
             applicationTitle: any;
             referenceNumber: any;
+            deadline: string | undefined;
             isComplete: boolean;
         }[];
     }>;
     private getApplicantSummary;
     private getTenantSummary;
     getRnecSummary(): Promise<{
-        tenantBreakdowns: {
-            tenantId: any;
-            tenantName: any;
-            tenantCode: any;
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
             total: number;
             approved: number;
-            underReview: number;
+            pending: number;
             rejected: number;
         }[];
-        totalSubmissions: number;
-        pendingScreening: number;
-        pendingReview: number;
-        approved: number;
-        rejected: number;
-        paymentPending: number;
-        activeMonitoring: number;
-        reviewerWorkload: {
-            reviewerId: any;
-            name: string;
-            assignedCount: any;
-        }[];
+    }>;
+    getSystemAdminDashboard(): Promise<{
+        totalUsers: number;
+        totalTenants: number;
+        totalRoles: number;
+        recentAuditEvents: number;
     }>;
 }

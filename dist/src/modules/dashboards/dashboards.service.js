@@ -21,7 +21,7 @@ let DashboardsService = class DashboardsService {
     }
     async getSummary(role, userId, tenantId) {
         if (role === user_role_enum_1.UserRole.APPLICANT) {
-            return this.getApplicantSummary(userId);
+            return this.getApplicantDashboard(userId);
         }
         if (role === user_role_enum_1.UserRole.RNEC_ADMIN || role === user_role_enum_1.UserRole.SYSTEM_ADMIN) {
             return this.getRnecSummary();
@@ -68,7 +68,7 @@ let DashboardsService = class DashboardsService {
         ]);
         const recentAssignments = await this.database.reviewAssignment.findMany({
             where: { reviewerId: userId, isActive: true },
-            orderBy: { assignedAt: 'desc' },
+            orderBy: { createdAt: 'desc' },
             take: 5,
             include: {
                 application: { select: { id: true, title: true, referenceNumber: true } },
@@ -77,12 +77,13 @@ let DashboardsService = class DashboardsService {
         return {
             assignedReviews,
             completedReviews,
-            pendingReviews: assignedReviews - completedReviews,
+            pendingReviews: Math.max(0, assignedReviews - completedReviews),
             recentAssignments: recentAssignments.map((a) => ({
                 id: a.id,
                 applicationId: a.applicationId,
                 applicationTitle: a.application?.title ?? '',
                 referenceNumber: a.application?.referenceNumber ?? '',
+                deadline: a.dueDate ? new Date(a.dueDate).toISOString() : undefined,
                 isComplete: !a.isActive,
             })),
         };
@@ -92,7 +93,7 @@ let DashboardsService = class DashboardsService {
     }
     async getTenantSummary(tenantId) {
         const where = tenantId ? { tenantId } : {};
-        const [totalSubmissions, pendingScreening, pendingReview, approved, rejected, paymentPending, activeMonitoring,] = await this.database.$transaction([
+        const [totalApplications, pendingScreening, underReview, approved, conditionallyApproved, rejected, paymentPending, activeMonitoring,] = await this.database.$transaction([
             this.database.application.count({ where }),
             this.database.application.count({
                 where: { ...where, status: enums_1.ApplicationStatus.SCREENING },
@@ -104,6 +105,9 @@ let DashboardsService = class DashboardsService {
                 where: { ...where, status: enums_1.ApplicationStatus.APPROVED },
             }),
             this.database.application.count({
+                where: { ...where, status: enums_1.ApplicationStatus.CONDITIONALLY_APPROVED },
+            }),
+            this.database.application.count({
                 where: { ...where, status: enums_1.ApplicationStatus.REJECTED },
             }),
             this.database.application.count({
@@ -113,16 +117,27 @@ let DashboardsService = class DashboardsService {
                 where: { ...where, status: enums_1.ApplicationStatus.MONITORING_ACTIVE },
             }),
         ]);
+        const applicationsByStatus = [
+            { status: enums_1.ApplicationStatus.SCREENING, count: pendingScreening },
+            { status: enums_1.ApplicationStatus.UNDER_REVIEW, count: underReview },
+            { status: enums_1.ApplicationStatus.APPROVED, count: approved },
+            { status: enums_1.ApplicationStatus.CONDITIONALLY_APPROVED, count: conditionallyApproved },
+            { status: enums_1.ApplicationStatus.REJECTED, count: rejected },
+            { status: enums_1.ApplicationStatus.PAYMENT_PENDING, count: paymentPending },
+            { status: enums_1.ApplicationStatus.MONITORING_ACTIVE, count: activeMonitoring },
+        ];
         const reviewerWorkload = await this.database.reviewAssignment.groupBy({
             by: ['reviewerId'],
             where: { isActive: true, ...(tenantId ? { application: { tenantId } } : {}) },
             _count: { reviewerId: true },
         });
         const reviewerIds = reviewerWorkload.map((r) => r.reviewerId);
-        const reviewers = await this.database.user.findMany({
-            where: { id: { in: reviewerIds } },
-            select: { id: true, firstName: true, lastName: true },
-        });
+        const reviewers = reviewerIds.length > 0
+            ? await this.database.user.findMany({
+                where: { id: { in: reviewerIds } },
+                select: { id: true, firstName: true, lastName: true },
+            })
+            : [];
         const reviewerMap = new Map(reviewers.map((r) => [r.id, r]));
         const workload = reviewerWorkload.map((r) => ({
             reviewerId: r.reviewerId,
@@ -131,14 +146,44 @@ let DashboardsService = class DashboardsService {
                 : 'Unknown',
             assignedCount: r._count.reviewerId,
         }));
+        const recentTransitions = await this.database.workflowTransition.findMany({
+            where: tenantId ? { application: { tenantId } } : {},
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+            include: {
+                application: { select: { id: true, referenceNumber: true, title: true } },
+            },
+        });
+        const actorIds = [
+            ...new Set(recentTransitions.filter((t) => t.actorId).map((t) => t.actorId)),
+        ];
+        const actors = actorIds.length > 0
+            ? await this.database.user.findMany({
+                where: { id: { in: actorIds } },
+                select: { id: true, firstName: true, lastName: true },
+            })
+            : [];
+        const actorMap = new Map(actors.map((a) => [a.id, a]));
+        const recentActivity = recentTransitions.map((t) => ({
+            applicationId: t.applicationId,
+            referenceNumber: t.application?.referenceNumber ?? 'N/A',
+            action: t.toStatus,
+            actorName: t.actorId && actorMap.has(t.actorId)
+                ? `${actorMap.get(t.actorId).firstName} ${actorMap.get(t.actorId).lastName}`
+                : 'System',
+            createdAt: new Date(t.createdAt).toISOString(),
+        }));
         return {
-            totalSubmissions,
+            totalApplications,
             pendingScreening,
-            pendingReview,
+            underReview,
             approved,
+            conditionallyApproved,
             rejected,
             paymentPending,
             activeMonitoring,
+            applicationsByStatus,
+            recentActivity,
             reviewerWorkload: workload,
         };
     }
@@ -146,10 +191,10 @@ let DashboardsService = class DashboardsService {
         const global = await this.getTenantSummary();
         const tenants = await this.database.tenant.findMany({
             where: { isActive: true },
-            select: { id: true, name: true, code: true },
+            select: { id: true, name: true, code: true, isActive: true },
         });
-        const tenantBreakdowns = await Promise.all(tenants.map(async (tenant) => {
-            const counts = await this.database.$transaction([
+        const tenantStats = await Promise.all(tenants.map(async (tenant) => {
+            const [total, tenantApproved, pending, tenantRejected] = await this.database.$transaction([
                 this.database.application.count({ where: { tenantId: tenant.id } }),
                 this.database.application.count({
                     where: { tenantId: tenant.id, status: enums_1.ApplicationStatus.APPROVED },
@@ -162,19 +207,38 @@ let DashboardsService = class DashboardsService {
                 }),
             ]);
             return {
-                tenantId: tenant.id,
-                tenantName: tenant.name,
-                tenantCode: tenant.code,
-                total: counts[0],
-                approved: counts[1],
-                underReview: counts[2],
-                rejected: counts[3],
+                tenant: {
+                    id: tenant.id,
+                    name: tenant.name,
+                    code: tenant.code,
+                    isActive: tenant.isActive,
+                },
+                total,
+                approved: tenantApproved,
+                pending,
+                rejected: tenantRejected,
             };
         }));
         return {
-            ...global,
-            tenantBreakdowns,
+            totalApplications: global.totalApplications,
+            totalApproved: global.approved,
+            totalPending: global.underReview,
+            totalRejected: global.rejected,
+            tenantStats,
         };
+    }
+    async getSystemAdminDashboard() {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const [totalUsers, totalTenants, totalRoles, recentAuditEvents] = await this.database.$transaction([
+            this.database.user.count({}),
+            this.database.tenant.count({}),
+            this.database.role.count({}),
+            this.database.auditLog.count({
+                where: { createdAt: { gte: sevenDaysAgo } },
+            }),
+        ]);
+        return { totalUsers, totalTenants, totalRoles, recentAuditEvents };
     }
 };
 exports.DashboardsService = DashboardsService;

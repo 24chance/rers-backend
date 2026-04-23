@@ -10,17 +10,46 @@ export declare class DashboardsController {
         approvedApplications: number;
         recentApplications: any[];
     } | {
-        totalSubmissions: number;
+        totalApplications: number;
         pendingScreening: number;
-        pendingReview: number;
+        underReview: number;
         approved: number;
+        conditionallyApproved: number;
         rejected: number;
         paymentPending: number;
         activeMonitoring: number;
+        applicationsByStatus: {
+            status: import("../../common/enums").ApplicationStatus;
+            count: number;
+        }[];
+        recentActivity: {
+            applicationId: any;
+            referenceNumber: any;
+            action: string;
+            actorName: string;
+            createdAt: string;
+        }[];
         reviewerWorkload: {
             reviewerId: any;
             name: string;
             assignedCount: any;
+        }[];
+    } | {
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
+            total: number;
+            approved: number;
+            pending: number;
+            rejected: number;
         }[];
     }>;
     getApplicantDashboard(user: JwtPayload): Promise<{
@@ -39,6 +68,7 @@ export declare class DashboardsController {
             applicationId: any;
             applicationTitle: any;
             referenceNumber: any;
+            deadline: string | undefined;
             isComplete: boolean;
         }[];
     }>;
@@ -49,87 +79,89 @@ export declare class DashboardsController {
         approvedApplications: number;
         recentApplications: any[];
     } | {
-        totalSubmissions: number;
+        totalApplications: number;
         pendingScreening: number;
-        pendingReview: number;
+        underReview: number;
         approved: number;
+        conditionallyApproved: number;
         rejected: number;
         paymentPending: number;
         activeMonitoring: number;
+        applicationsByStatus: {
+            status: import("../../common/enums").ApplicationStatus;
+            count: number;
+        }[];
+        recentActivity: {
+            applicationId: any;
+            referenceNumber: any;
+            action: string;
+            actorName: string;
+            createdAt: string;
+        }[];
         reviewerWorkload: {
             reviewerId: any;
             name: string;
             assignedCount: any;
+        }[];
+    } | {
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
+            total: number;
+            approved: number;
+            pending: number;
+            rejected: number;
         }[];
     }>;
     getRnecSummary(): Promise<{
-        tenantBreakdowns: {
-            tenantId: any;
-            tenantName: any;
-            tenantCode: any;
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
             total: number;
             approved: number;
-            underReview: number;
+            pending: number;
             rejected: number;
-        }[];
-        totalSubmissions: number;
-        pendingScreening: number;
-        pendingReview: number;
-        approved: number;
-        rejected: number;
-        paymentPending: number;
-        activeMonitoring: number;
-        reviewerWorkload: {
-            reviewerId: any;
-            name: string;
-            assignedCount: any;
         }[];
     }>;
     getRnecAdminDashboard(): Promise<{
-        tenantBreakdowns: {
-            tenantId: any;
-            tenantName: any;
-            tenantCode: any;
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
             total: number;
             approved: number;
-            underReview: number;
+            pending: number;
             rejected: number;
-        }[];
-        totalSubmissions: number;
-        pendingScreening: number;
-        pendingReview: number;
-        approved: number;
-        rejected: number;
-        paymentPending: number;
-        activeMonitoring: number;
-        reviewerWorkload: {
-            reviewerId: any;
-            name: string;
-            assignedCount: any;
         }[];
     }>;
     getSystemAdminDashboard(): Promise<{
-        tenantBreakdowns: {
-            tenantId: any;
-            tenantName: any;
-            tenantCode: any;
-            total: number;
-            approved: number;
-            underReview: number;
-            rejected: number;
-        }[];
-        totalSubmissions: number;
-        pendingScreening: number;
-        pendingReview: number;
-        approved: number;
-        rejected: number;
-        paymentPending: number;
-        activeMonitoring: number;
-        reviewerWorkload: {
-            reviewerId: any;
-            name: string;
-            assignedCount: any;
-        }[];
+        totalUsers: number;
+        totalTenants: number;
+        totalRoles: number;
+        recentAuditEvents: number;
     }>;
     getChairpersonDashboard(user: JwtPayload): Promise<{
         totalApplications: number;
@@ -138,17 +170,46 @@ export declare class DashboardsController {
         approvedApplications: number;
         recentApplications: any[];
     } | {
-        totalSubmissions: number;
+        totalApplications: number;
         pendingScreening: number;
-        pendingReview: number;
+        underReview: number;
         approved: number;
+        conditionallyApproved: number;
         rejected: number;
         paymentPending: number;
         activeMonitoring: number;
+        applicationsByStatus: {
+            status: import("../../common/enums").ApplicationStatus;
+            count: number;
+        }[];
+        recentActivity: {
+            applicationId: any;
+            referenceNumber: any;
+            action: string;
+            actorName: string;
+            createdAt: string;
+        }[];
         reviewerWorkload: {
             reviewerId: any;
             name: string;
             assignedCount: any;
+        }[];
+    } | {
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
+            total: number;
+            approved: number;
+            pending: number;
+            rejected: number;
         }[];
     }>;
     getFinanceDashboard(user: JwtPayload): Promise<{
@@ -158,17 +219,46 @@ export declare class DashboardsController {
         approvedApplications: number;
         recentApplications: any[];
     } | {
-        totalSubmissions: number;
+        totalApplications: number;
         pendingScreening: number;
-        pendingReview: number;
+        underReview: number;
         approved: number;
+        conditionallyApproved: number;
         rejected: number;
         paymentPending: number;
         activeMonitoring: number;
+        applicationsByStatus: {
+            status: import("../../common/enums").ApplicationStatus;
+            count: number;
+        }[];
+        recentActivity: {
+            applicationId: any;
+            referenceNumber: any;
+            action: string;
+            actorName: string;
+            createdAt: string;
+        }[];
         reviewerWorkload: {
             reviewerId: any;
             name: string;
             assignedCount: any;
+        }[];
+    } | {
+        totalApplications: number;
+        totalApproved: number;
+        totalPending: number;
+        totalRejected: number;
+        tenantStats: {
+            tenant: {
+                id: any;
+                name: any;
+                code: any;
+                isActive: any;
+            };
+            total: number;
+            approved: number;
+            pending: number;
+            rejected: number;
         }[];
     }>;
 }

@@ -45,7 +45,7 @@ let DashboardsController = class DashboardsController {
         return this.dashboardsService.getRnecSummary();
     }
     getSystemAdminDashboard() {
-        return this.dashboardsService.getRnecSummary();
+        return this.dashboardsService.getSystemAdminDashboard();
     }
     getChairpersonDashboard(user) {
         return this.dashboardsService.getSummary(user.role, user.id, user.tenantId);
