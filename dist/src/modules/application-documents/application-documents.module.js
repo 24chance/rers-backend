@@ -8,7 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApplicationDocumentsModule = void 0;
 const common_1 = require("@nestjs/common");
-const platform_express_1 = require("@nestjs/platform-express");
+const cloudinary_service_1 = require("../../common/cloudinary/cloudinary.service");
 const database_module_1 = require("../../common/database/database.module");
 const application_documents_controller_1 = require("./application-documents.controller");
 const application_documents_service_1 = require("./application-documents.service");
@@ -17,14 +17,9 @@ let ApplicationDocumentsModule = class ApplicationDocumentsModule {
 exports.ApplicationDocumentsModule = ApplicationDocumentsModule;
 exports.ApplicationDocumentsModule = ApplicationDocumentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [
-            database_module_1.DatabaseModule,
-            platform_express_1.MulterModule.register({
-                dest: './uploads',
-            }),
-        ],
+        imports: [database_module_1.DatabaseModule],
         controllers: [application_documents_controller_1.ApplicationDocumentsController],
-        providers: [application_documents_service_1.ApplicationDocumentsService],
+        providers: [application_documents_service_1.ApplicationDocumentsService, cloudinary_service_1.CloudinaryService],
         exports: [application_documents_service_1.ApplicationDocumentsService],
     })
 ], ApplicationDocumentsModule);

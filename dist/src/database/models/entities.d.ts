@@ -146,6 +146,7 @@ export declare class ApplicationDocument {
     mimeType: string;
     size: number;
     path: string;
+    cloudinaryPublicId: string | null;
     documentType: DocumentType;
     version: number;
     uploadedById: string | null;
@@ -200,6 +201,7 @@ export declare class Query {
     resolvedAt: Date | null;
     createdAt: Date;
     application: Application;
+    raisedBy: User | null;
     responses: QueryResponse[];
 }
 export declare class QueryResponse {
@@ -209,6 +211,7 @@ export declare class QueryResponse {
     response: string;
     createdAt: Date;
     query: Query;
+    responder: User | null;
 }
 export declare class Decision {
     id: string;
@@ -370,4 +373,4 @@ export declare class AuditLog {
     actor: User | null;
     tenant: Tenant | null;
 }
-export declare const databaseEntities: (typeof Tenant | typeof User | typeof Application | typeof Institution | typeof AuditLog | typeof Role | typeof RolePermission | typeof Permission | typeof ApplicantProfile | typeof ReviewAssignment | typeof Review | typeof Notification | typeof ApplicationDocument | typeof WorkflowTransition | typeof Decision | typeof Certificate | typeof Invoice | typeof Query | typeof Amendment | typeof Renewal | typeof ProgressReport | typeof AdverseEvent | typeof ProtocolDeviation | typeof ClosureReport | typeof QueryResponse | typeof Payment | typeof Receipt)[];
+export declare const databaseEntities: (typeof Tenant | typeof Role | typeof Permission | typeof RolePermission | typeof User | typeof ApplicantProfile | typeof Institution | typeof Application | typeof ApplicationDocument | typeof WorkflowTransition | typeof ReviewAssignment | typeof Review | typeof Query | typeof QueryResponse | typeof Decision | typeof Certificate | typeof Invoice | typeof Payment | typeof Receipt | typeof Amendment | typeof Renewal | typeof ProgressReport | typeof AdverseEvent | typeof ProtocolDeviation | typeof ClosureReport | typeof Notification | typeof AuditLog)[];

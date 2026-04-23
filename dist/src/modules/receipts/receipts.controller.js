@@ -16,6 +16,7 @@ exports.ReceiptsController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
@@ -25,8 +26,11 @@ let ReceiptsController = class ReceiptsController {
     constructor(receiptsService) {
         this.receiptsService = receiptsService;
     }
-    findAll() {
-        return this.receiptsService.findAll();
+    findAll(user) {
+        const tenantId = user.role === user_role_enum_1.UserRole.FINANCE_OFFICER || user.role === user_role_enum_1.UserRole.IRB_ADMIN
+            ? (user.tenantId ?? undefined)
+            : undefined;
+        return this.receiptsService.findAll(tenantId);
     }
     findOne(id) {
         return this.receiptsService.findOne(id);
@@ -41,8 +45,9 @@ __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'Get all receipts (FINANCE_OFFICER / admin)' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Receipts returned.' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], ReceiptsController.prototype, "findAll", null);
 __decorate([

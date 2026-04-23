@@ -16,6 +16,7 @@ const enums_1 = require("../../../common/enums");
 class CreateApplicationDto {
     title;
     type;
+    tenantId;
     destinationId;
     principalInvestigator;
     coInvestigators;
@@ -43,6 +44,12 @@ __decorate([
     (0, class_validator_1.IsEnum)(enums_1.ApplicationType),
     __metadata("design:type", String)
 ], CreateApplicationDto.prototype, "type", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'UUID of the IRB tenant the applicant is submitting to' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateApplicationDto.prototype, "tenantId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'UUID of the destination institution' }),
     (0, class_validator_1.IsOptional)(),

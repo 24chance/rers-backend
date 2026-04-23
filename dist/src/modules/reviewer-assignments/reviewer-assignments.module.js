@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReviewerAssignmentsModule = void 0;
 const common_1 = require("@nestjs/common");
 const database_module_1 = require("../../common/database/database.module");
+const application_reviewers_controller_1 = require("./application-reviewers.controller");
 const reviewer_assignments_controller_1 = require("./reviewer-assignments.controller");
 const reviewer_assignments_service_1 = require("./reviewer-assignments.service");
 let ReviewerAssignmentsModule = class ReviewerAssignmentsModule {
@@ -17,7 +18,7 @@ exports.ReviewerAssignmentsModule = ReviewerAssignmentsModule;
 exports.ReviewerAssignmentsModule = ReviewerAssignmentsModule = __decorate([
     (0, common_1.Module)({
         imports: [database_module_1.DatabaseModule],
-        controllers: [reviewer_assignments_controller_1.ReviewerAssignmentsController],
+        controllers: [reviewer_assignments_controller_1.ReviewerAssignmentsController, application_reviewers_controller_1.ApplicationReviewersController],
         providers: [reviewer_assignments_service_1.ReviewerAssignmentsService],
         exports: [reviewer_assignments_service_1.ReviewerAssignmentsService],
     })

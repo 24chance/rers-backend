@@ -44,6 +44,9 @@ let ApplicationsController = class ApplicationsController {
     update(id, dto, user) {
         return this.applicationsService.update(id, user.id, dto);
     }
+    remove(id, user) {
+        return this.applicationsService.remove(id, user.id);
+    }
     submit(id, _dto, user) {
         return this.applicationsService.submit(id, user.id);
     }
@@ -111,6 +114,21 @@ __decorate([
     __metadata("design:paramtypes", [String, update_application_dto_1.UpdateApplicationDto, Object]),
     __metadata("design:returntype", void 0)
 ], ApplicationsController.prototype, "update", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete a DRAFT application (applicant only)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'Application UUID' }),
+    (0, swagger_1.ApiResponse)({ status: 204, description: 'Application deleted.' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Application is not in DRAFT status.' }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden.' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Application not found.' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], ApplicationsController.prototype, "remove", null);
 __decorate([
     (0, common_1.Post)(':id/submit'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

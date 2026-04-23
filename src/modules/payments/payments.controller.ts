@@ -57,6 +57,20 @@ export class PaymentsController {
     return this.paymentsService.findByInvoice(invoiceId);
   }
 
+  // GET /payments
+  @Roles(UserRole.FINANCE_OFFICER, UserRole.IRB_ADMIN, UserRole.RNEC_ADMIN, UserRole.SYSTEM_ADMIN)
+  @Get('payments')
+  @ApiOperation({ summary: 'Get all payments (FINANCE_OFFICER / admin)' })
+  @ApiResponse({ status: 200, description: 'Payments returned.' })
+  findAll(@CurrentUser() user: JwtPayload) {
+    const tenantId =
+      user.role === UserRole.FINANCE_OFFICER || user.role === UserRole.IRB_ADMIN
+        ? (user.tenantId ?? undefined)
+        : undefined;
+
+    return this.paymentsService.findAll(tenantId);
+  }
+
   // PATCH /payments/:id/verify
   @Roles(UserRole.FINANCE_OFFICER, UserRole.IRB_ADMIN, UserRole.RNEC_ADMIN, UserRole.SYSTEM_ADMIN)
   @Patch('payments/:id/verify')

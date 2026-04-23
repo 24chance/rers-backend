@@ -1,10 +1,24 @@
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, NotificationType } from '../../common/enums';
+import {
+  ApplicationStatus,
+  NotificationType,
+  PaymentStatus,
+} from '../../common/enums';
 import { DatabaseService } from '../../common/database/database.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { UserRole } from '../../common/enums/user-role.enum';
+
+interface InvoiceActorContext {
+  id: string;
+  role: UserRole;
+  tenantId: string | null;
+}
 
 @Injectable()
 export class InvoicesService {
@@ -12,14 +26,53 @@ export class InvoicesService {
 
   // ─── create ──────────────────────────────────────────────────────────────────
 
-  async create(applicationId: string, dto: CreateInvoiceDto) {
+  async create(
+    applicationId: string,
+    dto: CreateInvoiceDto,
+    actor: InvoiceActorContext,
+  ) {
     const application = await this.database.application.findUnique({
       where: { id: applicationId },
-      select: { id: true, status: true, title: true, applicantId: true },
+      select: {
+        id: true,
+        status: true,
+        title: true,
+        applicantId: true,
+        tenantId: true,
+      },
     });
 
     if (!application) {
       throw new NotFoundException(`Application "${applicationId}" not found.`);
+    }
+
+    if (
+      actor.role === UserRole.FINANCE_OFFICER
+      && application.tenantId !== actor.tenantId
+    ) {
+      throw new ForbiddenException(
+        'You can only create invoices for applications in your tenant.',
+      );
+    }
+
+    if (application.status !== ApplicationStatus.PAYMENT_PENDING) {
+      throw new BadRequestException(
+        `Only applications in PAYMENT_PENDING status can be invoiced. Current status: "${application.status}".`,
+      );
+    }
+
+    const existingInvoice = await this.database.invoice.findFirst({
+      where: {
+        applicationId,
+        status: { in: [PaymentStatus.PENDING, PaymentStatus.VERIFIED] },
+      },
+      select: { id: true },
+    });
+
+    if (existingInvoice) {
+      throw new ConflictException(
+        'An active invoice already exists for this application.',
+      );
     }
 
     const invoice = await this.database.invoice.create({
@@ -34,21 +87,6 @@ export class InvoicesService {
         application: {
           select: { id: true, referenceNumber: true, title: true },
         },
-      },
-    });
-
-    // Update application status to PAYMENT_PENDING
-    await this.database.application.update({
-      where: { id: applicationId },
-      data: { status: ApplicationStatus.PAYMENT_PENDING },
-    });
-
-    await this.database.workflowTransition.create({
-      data: {
-        applicationId,
-        fromStatus: application.status,
-        toStatus: ApplicationStatus.PAYMENT_PENDING,
-        reason: 'Invoice created — payment required',
       },
     });
 

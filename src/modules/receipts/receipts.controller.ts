@@ -12,6 +12,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -29,8 +31,13 @@ export class ReceiptsController {
   @Get()
   @ApiOperation({ summary: 'Get all receipts (FINANCE_OFFICER / admin)' })
   @ApiResponse({ status: 200, description: 'Receipts returned.' })
-  findAll() {
-    return this.receiptsService.findAll();
+  findAll(@CurrentUser() user: JwtPayload) {
+    const tenantId =
+      user.role === UserRole.FINANCE_OFFICER || user.role === UserRole.IRB_ADMIN
+        ? (user.tenantId ?? undefined)
+        : undefined;
+
+    return this.receiptsService.findAll(tenantId);
   }
 
   // GET /receipts/:id

@@ -35,6 +35,9 @@ declare class ModelAdapter {
     create(options: DatabaseCreateOptions): Promise<any>;
     update(options: DatabaseUpdateOptions): Promise<any>;
     delete(options: DatabaseDeleteOptions): Promise<any | null>;
+    deleteMany(options: DatabaseDeleteOptions): Promise<{
+        count: number;
+    }>;
     updateMany(options: DatabaseUpdateOptions): Promise<{
         count: number;
     }>;

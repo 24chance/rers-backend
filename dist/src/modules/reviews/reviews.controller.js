@@ -35,6 +35,12 @@ let ReviewsController = class ReviewsController {
     findByReviewer(reviewerId) {
         return this.reviewsService.findByReviewer(reviewerId);
     }
+    findAssignments(user) {
+        return this.reviewsService.findAssignmentsForReviewer(user.id);
+    }
+    openAssignmentReview(assignmentId, user) {
+        return this.reviewsService.openReviewForAssignment(assignmentId, user.id);
+    }
     findOne(id, user) {
         return this.reviewsService.findOne(id, user.id);
     }
@@ -62,7 +68,7 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Get all reviews for an application' }),
     (0, swagger_1.ApiParam)({ name: 'applicationId', description: 'Application UUID' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Reviews returned.' }),
-    __param(0, (0, common_1.Param)('applicationId')),
+    __param(0, (0, common_1.Param)('applicationId', new common_1.ParseUUIDPipe())),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
@@ -72,19 +78,53 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: "Get a reviewer's own reviews" }),
     (0, swagger_1.ApiParam)({ name: 'reviewerId', description: 'Reviewer UUID' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Reviews returned.' }),
-    __param(0, (0, common_1.Param)('reviewerId')),
+    __param(0, (0, common_1.Param)('reviewerId', new common_1.ParseUUIDPipe())),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], ReviewsController.prototype, "findByReviewer", null);
 __decorate([
+    (0, common_1.Get)('assignments'),
+    (0, swagger_1.ApiOperation)({ summary: "Get the current reviewer's assignments" }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Assignments returned.' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], ReviewsController.prototype, "findAssignments", null);
+__decorate([
+    (0, common_1.Post)('assignments/:assignmentId/open'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get or create the review for an assignment (reviewer only)',
+    }),
+    (0, swagger_1.ApiParam)({ name: 'assignmentId', description: 'Review assignment UUID' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Review returned.' }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Assignment is inactive or conflicted.',
+    }),
+    (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden.' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Assignment not found.' }),
+    __param(0, (0, common_1.Param)('assignmentId', new common_1.ParseUUIDPipe())),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], ReviewsController.prototype, "openAssignmentReview", null);
+__decorate([
     (0, common_1.Get)(':id'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get a single review (reviewer only)' }),
-    (0, swagger_1.ApiParam)({ name: 'id', description: 'Review UUID' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get a single review by review UUID or review-assignment UUID (reviewer only)',
+    }),
+    (0, swagger_1.ApiParam)({
+        name: 'id',
+        description: 'Review UUID or review assignment UUID',
+    }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Review returned.' }),
     (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden.' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Review not found.' }),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', new common_1.ParseUUIDPipe())),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
@@ -93,13 +133,18 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/submit'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Submit a completed review' }),
-    (0, swagger_1.ApiParam)({ name: 'id', description: 'Review UUID' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Submit a completed review by review UUID or review-assignment UUID',
+    }),
+    (0, swagger_1.ApiParam)({
+        name: 'id',
+        description: 'Review UUID or review assignment UUID',
+    }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Review submitted.' }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Already submitted.' }),
     (0, swagger_1.ApiResponse)({ status: 403, description: 'Forbidden.' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Review not found.' }),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', new common_1.ParseUUIDPipe())),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

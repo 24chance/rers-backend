@@ -12,8 +12,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateApplicationDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const enums_1 = require("../../../common/enums");
 class UpdateApplicationDto {
     title;
+    type;
+    tenantId;
     destinationId;
     principalInvestigator;
     coInvestigators;
@@ -36,6 +39,21 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateApplicationDto.prototype, "title", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({
+        enum: enums_1.ApplicationType,
+        description: 'Updated application type',
+    }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(enums_1.ApplicationType),
+    __metadata("design:type", String)
+], UpdateApplicationDto.prototype, "type", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Updated IRB tenant UUID' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], UpdateApplicationDto.prototype, "tenantId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'UUID of the destination institution' }),
     (0, class_validator_1.IsOptional)(),

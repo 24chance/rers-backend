@@ -7,5 +7,6 @@ export declare class PaymentsController {
     constructor(paymentsService: PaymentsService);
     create(invoiceId: string, dto: CreatePaymentDto): Promise<any>;
     findByInvoice(invoiceId: string): Promise<any[]>;
+    findAll(user: JwtPayload): Promise<any[]>;
     verify(id: string, dto: VerifyPaymentDto, user: JwtPayload): Promise<any>;
 }

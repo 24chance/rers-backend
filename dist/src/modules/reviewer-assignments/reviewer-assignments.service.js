@@ -13,6 +13,7 @@ exports.ReviewerAssignmentsService = void 0;
 const common_1 = require("@nestjs/common");
 const enums_1 = require("../../common/enums");
 const database_service_1 = require("../../common/database/database.service");
+const user_role_enum_1 = require("../../common/enums/user-role.enum");
 let ReviewerAssignmentsService = class ReviewerAssignmentsService {
     database;
     constructor(database) {
@@ -21,17 +22,37 @@ let ReviewerAssignmentsService = class ReviewerAssignmentsService {
     async assign(assignedById, dto) {
         const application = await this.database.application.findUnique({
             where: { id: dto.applicationId },
-            select: { id: true, status: true, title: true },
+            select: { id: true, status: true, title: true, tenantId: true },
         });
         if (!application) {
             throw new common_1.NotFoundException(`Application "${dto.applicationId}" not found.`);
         }
         const reviewer = await this.database.user.findUnique({
             where: { id: dto.reviewerId },
-            select: { id: true, firstName: true, lastName: true, email: true },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                tenantId: true,
+                role: { select: { name: true } },
+            },
         });
         if (!reviewer) {
             throw new common_1.NotFoundException(`Reviewer "${dto.reviewerId}" not found.`);
+        }
+        if (reviewer.role.name !== user_role_enum_1.UserRole.REVIEWER) {
+            throw new common_1.BadRequestException('Only users with the REVIEWER role can be assigned.');
+        }
+        if (application.tenantId &&
+            reviewer.tenantId &&
+            application.tenantId !== reviewer.tenantId) {
+            throw new common_1.ForbiddenException('You can only assign reviewers who belong to the same tenant as the application.');
+        }
+        if (application.status !== enums_1.ApplicationStatus.PAYMENT_VERIFIED
+            && application.status !== enums_1.ApplicationStatus.UNDER_REVIEW
+            && application.status !== enums_1.ApplicationStatus.DECISION_PENDING) {
+            throw new common_1.BadRequestException(`Reviewers can only be assigned after payment verification or while the application is already under review. Current status: "${application.status}".`);
         }
         const existing = await this.database.reviewAssignment.findFirst({
             where: {
@@ -57,9 +78,7 @@ let ReviewerAssignmentsService = class ReviewerAssignmentsService {
                 },
             },
         });
-        if (application.status !== enums_1.ApplicationStatus.UNDER_REVIEW &&
-            application.status !== enums_1.ApplicationStatus.APPROVED &&
-            application.status !== enums_1.ApplicationStatus.CONDITIONALLY_APPROVED) {
+        if (application.status === enums_1.ApplicationStatus.PAYMENT_VERIFIED) {
             await this.database.application.update({
                 where: { id: dto.applicationId },
                 data: { status: enums_1.ApplicationStatus.UNDER_REVIEW },

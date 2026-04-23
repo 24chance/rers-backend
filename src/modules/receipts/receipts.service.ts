@@ -97,12 +97,20 @@ export class ReceiptsService {
 
   // ─── findAll ─────────────────────────────────────────────────────────────────
 
-  async findAll(filters?: { paymentId?: string }) {
+  async findAll(tenantId?: string, filters?: { paymentId?: string }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
 
     if (filters?.paymentId) {
       where.paymentId = filters.paymentId;
+    }
+
+    if (tenantId) {
+      where.payment = {
+        invoice: {
+          application: { tenantId },
+        },
+      };
     }
 
     return this.database.receipt.findMany({
@@ -115,6 +123,27 @@ export class ReceiptsService {
             amount: true,
             method: true,
             referenceNumber: true,
+            invoice: {
+              select: {
+                id: true,
+                amount: true,
+                currency: true,
+                application: {
+                  select: {
+                    id: true,
+                    referenceNumber: true,
+                    title: true,
+                    applicant: {
+                      select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },

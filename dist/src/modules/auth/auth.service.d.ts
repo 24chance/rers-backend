@@ -1,5 +1,5 @@
 import { JwtService } from '@nestjs/jwt';
-interface AuthUserRecord {
+export interface AuthUserRecord {
     id: string;
     email: string;
     passwordHash: string;
@@ -78,4 +78,3 @@ export declare class AuthService {
         message: string;
     }>;
 }
-export {};

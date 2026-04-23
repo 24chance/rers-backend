@@ -17,8 +17,6 @@ const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const multer_1 = require("multer");
-const path_1 = require("path");
-const uuid_1 = require("uuid");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
@@ -35,9 +33,9 @@ let ApplicationDocumentsController = class ApplicationDocumentsController {
     findByApplication(id) {
         return this.documentsService.findByApplication(id);
     }
-    async getDocument(id, docId, user, res) {
-        const filePath = await this.documentsService.getDownloadPath(id, docId, user.id);
-        res.sendFile(filePath);
+    async getDocument(id, docId, user) {
+        const url = await this.documentsService.getUrl(id, docId);
+        return { url, statusCode: 302 };
     }
     deleteDocument(id, docId, user) {
         return this.documentsService.deleteDocument(id, docId, user.id);
@@ -48,19 +46,7 @@ __decorate([
     (0, common_1.Post)(),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
-        storage: (0, multer_1.diskStorage)({
-            destination: (_req, _file, cb) => {
-                const appId = _req.params['id'] ?? 'unknown';
-                const uploadDir = (0, path_1.join)(process.cwd(), 'uploads', appId);
-                require('fs').mkdirSync(uploadDir, { recursive: true });
-                cb(null, uploadDir);
-            },
-            filename: (_req, file, cb) => {
-                const uniqueSuffix = (0, uuid_1.v4)();
-                const ext = (0, path_1.extname)(file.originalname);
-                cb(null, `${uniqueSuffix}${ext}`);
-            },
-        }),
+        storage: (0, multer_1.memoryStorage)(),
         limits: { fileSize: 20 * 1024 * 1024 },
     })),
     (0, swagger_1.ApiConsumes)('multipart/form-data'),
@@ -75,7 +61,7 @@ __decorate([
             },
         },
     }),
-    (0, swagger_1.ApiOperation)({ summary: 'Upload a document for an application' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Upload a document for an application (stored on Cloudinary)' }),
     (0, swagger_1.ApiParam)({ name: 'id', description: 'Application UUID' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'Document uploaded.' }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Invalid file type or missing file.' }),
@@ -101,23 +87,23 @@ __decorate([
 ], ApplicationDocumentsController.prototype, "findByApplication", null);
 __decorate([
     (0, common_1.Get)(':docId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Download / retrieve document metadata by id' }),
+    (0, common_1.Redirect)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Redirect to the Cloudinary URL for a document' }),
     (0, swagger_1.ApiParam)({ name: 'id', description: 'Application UUID' }),
     (0, swagger_1.ApiParam)({ name: 'docId', description: 'Document UUID' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'File served.' }),
+    (0, swagger_1.ApiResponse)({ status: 302, description: 'Redirects to the Cloudinary file URL.' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Document not found.' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('docId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
-    __param(3, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object, Object]),
+    __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ApplicationDocumentsController.prototype, "getDocument", null);
 __decorate([
     (0, common_1.Delete)(':docId'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Delete a document by id' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Delete a document by id (also removes from Cloudinary)' }),
     (0, swagger_1.ApiParam)({ name: 'id', description: 'Application UUID' }),
     (0, swagger_1.ApiParam)({ name: 'docId', description: 'Document UUID' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Document deleted.' }),

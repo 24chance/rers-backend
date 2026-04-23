@@ -32,10 +32,10 @@ export class DecisionsController {
   constructor(private readonly decisionsService: DecisionsService) {}
 
   // POST /decisions/application/:applicationId
-  @Roles(UserRole.CHAIRPERSON, UserRole.IRB_ADMIN, UserRole.RNEC_ADMIN, UserRole.SYSTEM_ADMIN)
+  @Roles(UserRole.CHAIRPERSON)
   @Post('application/:applicationId')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Record a decision for an application (CHAIRPERSON / IRB_ADMIN)' })
+  @ApiOperation({ summary: 'Record the final decision for an application (CHAIRPERSON only)' })
   @ApiParam({ name: 'applicationId', description: 'Application UUID' })
   @ApiResponse({ status: 201, description: 'Decision recorded.' })
   @ApiResponse({ status: 404, description: 'Application not found.' })

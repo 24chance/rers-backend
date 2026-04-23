@@ -710,6 +710,7 @@ let ApplicationDocument = class ApplicationDocument {
     mimeType;
     size;
     path;
+    cloudinaryPublicId;
     documentType;
     version;
     uploadedById;
@@ -745,6 +746,10 @@ __decorate([
     (0, typeorm_1.Column)(),
     __metadata("design:type", String)
 ], ApplicationDocument.prototype, "path", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true, type: 'varchar' }),
+    __metadata("design:type", Object)
+], ApplicationDocument.prototype, "cloudinaryPublicId", void 0);
 __decorate([
     (0, typeorm_1.Column)({
         type: 'enum',
@@ -992,6 +997,7 @@ let Query = class Query {
     resolvedAt;
     createdAt;
     application;
+    raisedBy;
     responses;
 };
 exports.Query = Query;
@@ -1031,6 +1037,11 @@ __decorate([
     __metadata("design:type", Application)
 ], Query.prototype, "application", void 0);
 __decorate([
+    (0, typeorm_1.ManyToOne)(() => User, { nullable: true, eager: false }),
+    (0, typeorm_1.JoinColumn)({ name: 'raisedById' }),
+    __metadata("design:type", Object)
+], Query.prototype, "raisedBy", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => QueryResponse, (queryResponse) => queryResponse.query),
     __metadata("design:type", Array)
 ], Query.prototype, "responses", void 0);
@@ -1044,6 +1055,7 @@ let QueryResponse = class QueryResponse {
     response;
     createdAt;
     query;
+    responder;
 };
 exports.QueryResponse = QueryResponse;
 __decorate([
@@ -1071,6 +1083,11 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: 'queryId' }),
     __metadata("design:type", Query)
 ], QueryResponse.prototype, "query", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => User, { nullable: true, eager: false }),
+    (0, typeorm_1.JoinColumn)({ name: 'responderId' }),
+    __metadata("design:type", Object)
+], QueryResponse.prototype, "responder", void 0);
 exports.QueryResponse = QueryResponse = __decorate([
     (0, typeorm_1.Entity)('query_responses')
 ], QueryResponse);

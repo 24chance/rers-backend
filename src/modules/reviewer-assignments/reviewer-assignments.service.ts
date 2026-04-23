@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ApplicationStatus, NotificationType } from '../../common/enums';
 import { DatabaseService } from '../../common/database/database.service';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 
 @Injectable()
@@ -17,7 +18,7 @@ export class ReviewerAssignmentsService {
   async assign(assignedById: string, dto: CreateAssignmentDto) {
     const application = await this.database.application.findUnique({
       where: { id: dto.applicationId },
-      select: { id: true, status: true, title: true },
+      select: { id: true, status: true, title: true, tenantId: true },
     });
 
     if (!application) {
@@ -28,11 +29,42 @@ export class ReviewerAssignmentsService {
 
     const reviewer = await this.database.user.findUnique({
       where: { id: dto.reviewerId },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        tenantId: true,
+        role: { select: { name: true } },
+      },
     });
 
     if (!reviewer) {
       throw new NotFoundException(`Reviewer "${dto.reviewerId}" not found.`);
+    }
+
+    if (reviewer.role.name !== UserRole.REVIEWER) {
+      throw new BadRequestException('Only users with the REVIEWER role can be assigned.');
+    }
+
+    if (
+      application.tenantId &&
+      reviewer.tenantId &&
+      application.tenantId !== reviewer.tenantId
+    ) {
+      throw new ForbiddenException(
+        'You can only assign reviewers who belong to the same tenant as the application.',
+      );
+    }
+
+    if (
+      application.status !== ApplicationStatus.PAYMENT_VERIFIED
+      && application.status !== ApplicationStatus.UNDER_REVIEW
+      && application.status !== ApplicationStatus.DECISION_PENDING
+    ) {
+      throw new BadRequestException(
+        `Reviewers can only be assigned after payment verification or while the application is already under review. Current status: "${application.status}".`,
+      );
     }
 
     // Check for existing active assignment
@@ -66,11 +98,7 @@ export class ReviewerAssignmentsService {
     });
 
     // Move application to UNDER_REVIEW if not already
-    if (
-      application.status !== ApplicationStatus.UNDER_REVIEW &&
-      application.status !== ApplicationStatus.APPROVED &&
-      application.status !== ApplicationStatus.CONDITIONALLY_APPROVED
-    ) {
+    if (application.status === ApplicationStatus.PAYMENT_VERIFIED) {
       await this.database.application.update({
         where: { id: dto.applicationId },
         data: { status: ApplicationStatus.UNDER_REVIEW },

@@ -19,6 +19,15 @@ const screen_application_dto_1 = require("./dto/screen-application.dto");
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const EDITABLE_STATUSES = new Set([
+    enums_1.ApplicationStatus.DRAFT,
+    enums_1.ApplicationStatus.QUERY_RAISED,
+]);
+const TENANT_SCOPED_ROLES = new Set([
+    user_role_enum_1.UserRole.IRB_ADMIN,
+    user_role_enum_1.UserRole.CHAIRPERSON,
+    user_role_enum_1.UserRole.FINANCE_OFFICER,
+]);
 let ApplicationsService = class ApplicationsService {
     database;
     workflowsService;
@@ -41,7 +50,7 @@ let ApplicationsService = class ApplicationsService {
                 title: dto.title,
                 type: dto.type,
                 status: enums_1.ApplicationStatus.DRAFT,
-                tenantId: userTenantId,
+                tenantId: dto.tenantId ?? userTenantId,
                 applicantId: userId,
                 destinationId: dto.destinationId,
                 principalInvestigator: dto.principalInvestigator,
@@ -79,7 +88,7 @@ let ApplicationsService = class ApplicationsService {
         if (role === user_role_enum_1.UserRole.APPLICANT) {
             where.applicantId = userId;
         }
-        else if (role === user_role_enum_1.UserRole.IRB_ADMIN) {
+        else if (TENANT_SCOPED_ROLES.has(role)) {
             where.tenantId = userTenantId ?? undefined;
         }
         if (filters.status) {
@@ -138,7 +147,26 @@ let ApplicationsService = class ApplicationsService {
             application.applicantId !== userId) {
             throw new common_1.ForbiddenException('You do not have access to this application.');
         }
-        if (role === user_role_enum_1.UserRole.IRB_ADMIN) {
+        if (role === user_role_enum_1.UserRole.REVIEWER) {
+            const hasAccess = await Promise.all([
+                this.database.reviewAssignment.findFirst({
+                    where: {
+                        applicationId: id,
+                        reviewerId: userId,
+                    },
+                }),
+                this.database.review.findFirst({
+                    where: {
+                        applicationId: id,
+                        reviewerId: userId,
+                    },
+                }),
+            ]);
+            if (!hasAccess.some(Boolean)) {
+                throw new common_1.ForbiddenException('You do not have access to applications that are not assigned to you.');
+            }
+        }
+        if (TENANT_SCOPED_ROLES.has(role)) {
             const user = await this.database.user.findUnique({
                 where: { id: userId },
                 select: { tenantId: true },
@@ -157,8 +185,8 @@ let ApplicationsService = class ApplicationsService {
         if (!application) {
             throw new common_1.NotFoundException(`Application with id "${id}" not found.`);
         }
-        if (application.status !== enums_1.ApplicationStatus.DRAFT) {
-            throw new common_1.BadRequestException(`Only DRAFT applications can be edited. Current status: "${application.status}".`);
+        if (!EDITABLE_STATUSES.has(application.status)) {
+            throw new common_1.BadRequestException(`Only ${Array.from(EDITABLE_STATUSES).join(' or ')} applications can be edited. Current status: "${application.status}".`);
         }
         if (application.applicantId !== userId) {
             throw new common_1.ForbiddenException('You can only edit your own applications.');
@@ -167,6 +195,8 @@ let ApplicationsService = class ApplicationsService {
             where: { id },
             data: {
                 ...(dto.title !== undefined && { title: dto.title }),
+                ...(dto.type !== undefined && { type: dto.type }),
+                ...(dto.tenantId !== undefined && { tenantId: dto.tenantId }),
                 ...(dto.destinationId !== undefined && { destinationId: dto.destinationId }),
                 ...(dto.principalInvestigator !== undefined && {
                     principalInvestigator: dto.principalInvestigator,
@@ -257,6 +287,15 @@ let ApplicationsService = class ApplicationsService {
             include: this.defaultInclude(),
         });
         await this.workflowsService.recordTransition(id, enums_1.ApplicationStatus.SCREENING, toStatus, adminId, dto.reason);
+        if (dto.action === screen_application_dto_1.ScreeningAction.RAISE_QUERY && dto.reason) {
+            await this.database.query.create({
+                data: {
+                    applicationId: id,
+                    raisedById: adminId,
+                    question: dto.reason,
+                },
+            });
+        }
         return updated;
     }
     async advanceStatus(id, actorId, dto) {
@@ -275,6 +314,24 @@ let ApplicationsService = class ApplicationsService {
         });
         await this.workflowsService.recordTransition(id, application.status, dto.toStatus, actorId, dto.reason, dto.notes);
         return updated;
+    }
+    async remove(id, userId) {
+        const application = await this.database.application.findUnique({
+            where: { id },
+            select: { id: true, status: true, applicantId: true },
+        });
+        if (!application) {
+            throw new common_1.NotFoundException(`Application with id "${id}" not found.`);
+        }
+        if (application.applicantId !== userId) {
+            throw new common_1.ForbiddenException('You can only delete your own applications.');
+        }
+        if (application.status !== enums_1.ApplicationStatus.DRAFT) {
+            throw new common_1.BadRequestException(`Only DRAFT applications can be deleted. Current status: "${application.status}".`);
+        }
+        await this.database.applicationDocument.deleteMany({ where: { applicationId: id } });
+        await this.database.workflowTransition.deleteMany({ where: { applicationId: id } });
+        await this.database.application.delete({ where: { id } });
     }
     async getTimeline(id) {
         return this.workflowsService.getTimeline(id);

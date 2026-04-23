@@ -5,7 +5,7 @@ export declare class ReceiptsService {
     create(paymentId: string, amount: number): Promise<any>;
     findByPayment(paymentId: string): Promise<any>;
     findOne(id: string): Promise<any>;
-    findAll(filters?: {
+    findAll(tenantId?: string, filters?: {
         paymentId?: string;
     }): Promise<any[]>;
     private generateReceiptNumber;

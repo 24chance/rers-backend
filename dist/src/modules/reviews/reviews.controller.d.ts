@@ -8,6 +8,8 @@ export declare class ReviewsController {
     startReview(dto: CreateReviewDto, user: JwtPayload): Promise<any>;
     findByApplication(applicationId: string): Promise<any[]>;
     findByReviewer(reviewerId: string): Promise<any[]>;
+    findAssignments(user: JwtPayload): Promise<any[]>;
+    openAssignmentReview(assignmentId: string, user: JwtPayload): Promise<any>;
     findOne(id: string, user: JwtPayload): Promise<any>;
     submitReview(id: string, dto: SubmitReviewDto, user: JwtPayload): Promise<any>;
 }

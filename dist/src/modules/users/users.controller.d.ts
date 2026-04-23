@@ -1,4 +1,5 @@
 import type { JwtPayload } from '../../common/decorators/current-user.decorator';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -7,7 +8,7 @@ export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
     create(dto: CreateUserDto, user: JwtPayload): Promise<any>;
-    findAll(page?: string, pageSize?: string, tenantId?: string, user?: JwtPayload): Promise<{
+    findAll(page?: string, pageSize?: string, tenantId?: string, role?: UserRole, user?: JwtPayload): Promise<{
         data: any[];
         meta: {
             total: number;

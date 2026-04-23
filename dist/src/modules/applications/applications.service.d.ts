@@ -26,6 +26,7 @@ export declare class ApplicationsService {
     submit(id: string, userId: string): Promise<any>;
     screen(id: string, adminId: string, dto: ScreenApplicationDto): Promise<any>;
     advanceStatus(id: string, actorId: string, dto: AdvanceStatusDto): Promise<any>;
+    remove(id: string, userId: string): Promise<void>;
     getTimeline(id: string): Promise<{
         application: any;
         timeline: any[];

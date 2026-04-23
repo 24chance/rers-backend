@@ -139,6 +139,40 @@ export class PaymentsService {
     return updatedPayment;
   }
 
+  // ─── findAll ─────────────────────────────────────────────────────────────────
+
+  async findAll(tenantId?: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {};
+
+    if (tenantId) {
+      where.invoice = {
+        application: { tenantId },
+      };
+    }
+
+    return this.database.payment.findMany({
+      where,
+      include: {
+        invoice: {
+          select: {
+            id: true,
+            amount: true,
+            currency: true,
+            application: {
+              select: {
+                id: true,
+                referenceNumber: true,
+                title: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   // ─── findByInvoice ────────────────────────────────────────────────────────────
 
   async findByInvoice(invoiceId: string) {

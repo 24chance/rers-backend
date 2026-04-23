@@ -13,18 +13,42 @@ exports.InvoicesService = void 0;
 const common_1 = require("@nestjs/common");
 const enums_1 = require("../../common/enums");
 const database_service_1 = require("../../common/database/database.service");
+const user_role_enum_1 = require("../../common/enums/user-role.enum");
 let InvoicesService = class InvoicesService {
     database;
     constructor(database) {
         this.database = database;
     }
-    async create(applicationId, dto) {
+    async create(applicationId, dto, actor) {
         const application = await this.database.application.findUnique({
             where: { id: applicationId },
-            select: { id: true, status: true, title: true, applicantId: true },
+            select: {
+                id: true,
+                status: true,
+                title: true,
+                applicantId: true,
+                tenantId: true,
+            },
         });
         if (!application) {
             throw new common_1.NotFoundException(`Application "${applicationId}" not found.`);
+        }
+        if (actor.role === user_role_enum_1.UserRole.FINANCE_OFFICER
+            && application.tenantId !== actor.tenantId) {
+            throw new common_1.ForbiddenException('You can only create invoices for applications in your tenant.');
+        }
+        if (application.status !== enums_1.ApplicationStatus.PAYMENT_PENDING) {
+            throw new common_1.BadRequestException(`Only applications in PAYMENT_PENDING status can be invoiced. Current status: "${application.status}".`);
+        }
+        const existingInvoice = await this.database.invoice.findFirst({
+            where: {
+                applicationId,
+                status: { in: [enums_1.PaymentStatus.PENDING, enums_1.PaymentStatus.VERIFIED] },
+            },
+            select: { id: true },
+        });
+        if (existingInvoice) {
+            throw new common_1.ConflictException('An active invoice already exists for this application.');
         }
         const invoice = await this.database.invoice.create({
             data: {
@@ -38,18 +62,6 @@ let InvoicesService = class InvoicesService {
                 application: {
                     select: { id: true, referenceNumber: true, title: true },
                 },
-            },
-        });
-        await this.database.application.update({
-            where: { id: applicationId },
-            data: { status: enums_1.ApplicationStatus.PAYMENT_PENDING },
-        });
-        await this.database.workflowTransition.create({
-            data: {
-                applicationId,
-                fromStatus: application.status,
-                toStatus: enums_1.ApplicationStatus.PAYMENT_PENDING,
-                reason: 'Invoice created — payment required',
             },
         });
         await this.database.notification.create({

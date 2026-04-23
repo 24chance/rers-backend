@@ -24,10 +24,34 @@ let DecisionsService = class DecisionsService {
     async record(applicationId, actorId, dto) {
         const application = await this.database.application.findUnique({
             where: { id: applicationId },
-            select: { id: true, status: true, title: true, applicantId: true },
+            select: { id: true, status: true, title: true, applicantId: true, tenantId: true },
         });
         if (!application) {
             throw new common_1.NotFoundException(`Application "${applicationId}" not found.`);
+        }
+        const actor = await this.database.user.findUnique({
+            where: { id: actorId },
+            select: {
+                id: true,
+                tenantId: true,
+                role: { select: { name: true } },
+            },
+        });
+        if (!actor) {
+            throw new common_1.NotFoundException(`User "${actorId}" not found.`);
+        }
+        if (actor.role.name !== enums_1.UserRole.CHAIRPERSON) {
+            throw new common_1.ForbiddenException('Only the chairperson can record the final decision on an application.');
+        }
+        if (application.tenantId !== actor.tenantId) {
+            throw new common_1.ForbiddenException('You can only record decisions for applications in your tenant.');
+        }
+        const existingDecision = await this.database.decision.findFirst({
+            where: { applicationId },
+            select: { id: true },
+        });
+        if (existingDecision) {
+            throw new common_1.BadRequestException('A final decision has already been recorded for this application.');
         }
         const statusMap = {
             [enums_1.DecisionType.APPROVED]: enums_1.ApplicationStatus.APPROVED,

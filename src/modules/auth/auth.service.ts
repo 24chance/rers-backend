@@ -11,7 +11,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 /**
  * Minimal shape of an authenticated user record returned from the database.
  */
-interface AuthUserRecord {
+export interface AuthUserRecord {
   id: string;
   email: string;
   passwordHash: string;

@@ -113,6 +113,34 @@ let PaymentsService = class PaymentsService {
         await this.receiptsService.create(paymentId, Number(payment.amount));
         return updatedPayment;
     }
+    async findAll(tenantId) {
+        const where = {};
+        if (tenantId) {
+            where.invoice = {
+                application: { tenantId },
+            };
+        }
+        return this.database.payment.findMany({
+            where,
+            include: {
+                invoice: {
+                    select: {
+                        id: true,
+                        amount: true,
+                        currency: true,
+                        application: {
+                            select: {
+                                id: true,
+                                referenceNumber: true,
+                                title: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
     async findByInvoice(invoiceId) {
         const invoice = await this.database.invoice.findUnique({
             where: { id: invoiceId },

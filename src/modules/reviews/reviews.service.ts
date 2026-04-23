@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ApplicationStatus } from '../../common/enums';
 import { DatabaseService } from '../../common/database/database.service';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 
@@ -147,7 +148,7 @@ export class ReviewsService {
       throw new BadRequestException('This review has already been submitted.');
     }
 
-    return this.database.review.update({
+    const updatedReview = await this.database.review.update({
       where: { id: review.id },
       data: {
         comments: dto.comments,
@@ -158,6 +159,54 @@ export class ReviewsService {
       },
       include: this.defaultInclude(),
     });
+
+    const [application, assignments, completedReviews] = await Promise.all([
+      this.database.application.findUnique({
+        where: { id: review.applicationId },
+        select: { status: true },
+      }),
+      this.database.reviewAssignment.findMany({
+        where: {
+          applicationId: review.applicationId,
+          isActive: true,
+          conflictDeclared: false,
+        },
+      }),
+      this.database.review.findMany({
+        where: {
+          applicationId: review.applicationId,
+          isComplete: true,
+        },
+        select: { reviewerId: true },
+      }),
+    ]);
+
+    const completedReviewerIds = new Set(completedReviews.map((entry) => entry.reviewerId));
+    const allActiveAssignmentsCompleted =
+      assignments.length > 0
+      && assignments.every((assignment) => completedReviewerIds.has(assignment.reviewerId));
+
+    if (
+      application?.status === ApplicationStatus.UNDER_REVIEW
+      && allActiveAssignmentsCompleted
+    ) {
+      await this.database.application.update({
+        where: { id: review.applicationId },
+        data: { status: ApplicationStatus.DECISION_PENDING },
+      });
+
+      await this.database.workflowTransition.create({
+        data: {
+          applicationId: review.applicationId,
+          fromStatus: ApplicationStatus.UNDER_REVIEW,
+          toStatus: ApplicationStatus.DECISION_PENDING,
+          actorId: reviewerId,
+          reason: 'All assigned reviewers submitted their reviews',
+        },
+      });
+    }
+
+    return updatedReview;
   }
 
   // ─── findByApplication ────────────────────────────────────────────────────────

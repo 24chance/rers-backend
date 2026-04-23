@@ -11,7 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApplicationDocumentsService = void 0;
 const common_1 = require("@nestjs/common");
-const path_1 = require("path");
+const cloudinary_service_1 = require("../../common/cloudinary/cloudinary.service");
 const database_service_1 = require("../../common/database/database.service");
 const ALLOWED_MIME_TYPES = new Set([
     'application/pdf',
@@ -22,8 +22,10 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 let ApplicationDocumentsService = class ApplicationDocumentsService {
     database;
-    constructor(database) {
+    cloudinary;
+    constructor(database, cloudinary) {
         this.database = database;
+        this.cloudinary = cloudinary;
     }
     async uploadDocument(file, applicationId, dto, userId) {
         if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
@@ -36,14 +38,19 @@ let ApplicationDocumentsService = class ApplicationDocumentsService {
         if (!application) {
             throw new common_1.NotFoundException(`Application with id "${applicationId}" not found.`);
         }
+        const { url, publicId } = await this.cloudinary.upload(file.buffer, {
+            folder: `rers/applications/${applicationId}`,
+            originalName: file.originalname,
+        });
         const document = await this.database.applicationDocument.create({
             data: {
                 applicationId,
-                fileName: file.filename,
+                fileName: file.originalname,
                 originalName: file.originalname,
                 mimeType: file.mimetype,
                 size: file.size,
-                path: file.path,
+                path: url,
+                cloudinaryPublicId: publicId,
                 documentType: dto.documentType,
                 version: dto.version ?? 1,
                 uploadedById: userId,
@@ -78,17 +85,22 @@ let ApplicationDocumentsService = class ApplicationDocumentsService {
         if (document.uploadedById && document.uploadedById !== userId) {
             throw new common_1.ForbiddenException('You can only delete documents you uploaded.');
         }
+        if (document.cloudinaryPublicId) {
+            const resourceType = document.mimeType.startsWith('image/') ? 'image' : 'raw';
+            await this.cloudinary.delete(document.cloudinaryPublicId, resourceType);
+        }
         await this.database.applicationDocument.delete({ where: { id: docId } });
         return { message: `Document "${docId}" deleted.` };
     }
-    async getDownloadPath(applicationId, docId, _userId) {
+    async getUrl(applicationId, docId) {
         const document = await this.findOne(applicationId, docId);
-        return (0, path_1.join)(process.cwd(), document.path);
+        return document.path;
     }
 };
 exports.ApplicationDocumentsService = ApplicationDocumentsService;
 exports.ApplicationDocumentsService = ApplicationDocumentsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [database_service_1.DatabaseService])
+    __metadata("design:paramtypes", [database_service_1.DatabaseService,
+        cloudinary_service_1.CloudinaryService])
 ], ApplicationDocumentsService);
 //# sourceMappingURL=application-documents.service.js.map

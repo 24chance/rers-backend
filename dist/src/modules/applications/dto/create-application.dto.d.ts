@@ -2,6 +2,7 @@ import { ApplicationType } from '../../../common/enums';
 export declare class CreateApplicationDto {
     title: string;
     type: ApplicationType;
+    tenantId?: string;
     destinationId?: string;
     principalInvestigator?: string;
     coInvestigators?: string[];

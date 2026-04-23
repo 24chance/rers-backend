@@ -32,11 +32,12 @@ let UsersController = class UsersController {
     create(dto, user) {
         return this.usersService.createUser(dto, user);
     }
-    findAll(page, pageSize, tenantId, user) {
+    findAll(page, pageSize, tenantId, role, user) {
         return this.usersService.findAll({
             page: page ? parseInt(page, 10) : undefined,
             pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
             tenantId,
+            role,
         }, user);
     }
     findOne(id) {
@@ -78,13 +79,15 @@ __decorate([
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, type: Number }),
     (0, swagger_1.ApiQuery)({ name: 'pageSize', required: false, type: Number }),
     (0, swagger_1.ApiQuery)({ name: 'tenantId', required: false, type: String }),
+    (0, swagger_1.ApiQuery)({ name: 'role', required: false, enum: user_role_enum_1.UserRole }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Paginated list of users.' }),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('pageSize')),
     __param(2, (0, common_1.Query)('tenantId')),
-    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __param(3, (0, common_1.Query)('role')),
+    __param(4, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:paramtypes", [String, String, String, String, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "findAll", null);
 __decorate([

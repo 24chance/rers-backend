@@ -1,3 +1,4 @@
+import { UserRole } from '../../common/enums/user-role.enum';
 import { DatabaseService } from '../../common/database/database.service';
 import { UserProvisioningService } from '../../common/user-provisioning/user-provisioning.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
@@ -8,6 +9,7 @@ export interface FindAllQuery {
     page?: number;
     pageSize?: number;
     tenantId?: string;
+    role?: UserRole;
 }
 export declare class UsersService {
     private readonly database;

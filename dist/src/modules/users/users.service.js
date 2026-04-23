@@ -59,7 +59,14 @@ let UsersService = class UsersService {
         const tenantFilter = requestingUser.role === user_role_enum_1.UserRole.IRB_ADMIN
             ? (requestingUser.tenantId ?? undefined)
             : (query.tenantId ?? undefined);
-        const where = tenantFilter ? { tenantId: tenantFilter } : {};
+        const where = {};
+        if (tenantFilter)
+            where.tenantId = tenantFilter;
+        if (query.role) {
+            const roleRecord = await this.database.role.findUnique({ where: { name: query.role } });
+            if (roleRecord)
+                where.roleId = roleRecord.id;
+        }
         const [users, total] = await this.database.$transaction([
             this.database.user.findMany({
                 where,

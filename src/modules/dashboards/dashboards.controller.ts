@@ -78,7 +78,7 @@ export class DashboardsController {
   @Get('system_admin')
   @ApiOperation({ summary: 'System admin dashboard' })
   getSystemAdminDashboard() {
-    return this.dashboardsService.getRnecSummary();
+    return this.dashboardsService.getSystemAdminDashboard();
   }
 
   // GET /dashboards/chairperson

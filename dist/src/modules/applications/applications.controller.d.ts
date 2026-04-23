@@ -21,6 +21,7 @@ export declare class ApplicationsController {
     }>;
     findOne(id: string, user: JwtPayload): Promise<any>;
     update(id: string, dto: UpdateApplicationDto, user: JwtPayload): Promise<any>;
+    remove(id: string, user: JwtPayload): Promise<void>;
     submit(id: string, _dto: SubmitApplicationDto, user: JwtPayload): Promise<any>;
     screen(id: string, dto: ScreenApplicationDto, user: JwtPayload): Promise<any>;
     advanceStatus(id: string, dto: AdvanceStatusDto, user: JwtPayload): Promise<any>;

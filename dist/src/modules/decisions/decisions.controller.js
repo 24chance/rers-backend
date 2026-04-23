@@ -39,10 +39,10 @@ let DecisionsController = class DecisionsController {
 };
 exports.DecisionsController = DecisionsController;
 __decorate([
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.CHAIRPERSON, user_role_enum_1.UserRole.IRB_ADMIN, user_role_enum_1.UserRole.RNEC_ADMIN, user_role_enum_1.UserRole.SYSTEM_ADMIN),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.CHAIRPERSON),
     (0, common_1.Post)('application/:applicationId'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    (0, swagger_1.ApiOperation)({ summary: 'Record a decision for an application (CHAIRPERSON / IRB_ADMIN)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Record the final decision for an application (CHAIRPERSON only)' }),
     (0, swagger_1.ApiParam)({ name: 'applicationId', description: 'Application UUID' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'Decision recorded.' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Application not found.' }),

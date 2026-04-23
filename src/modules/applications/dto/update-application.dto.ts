@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsDateString,
+  IsEnum,
   IsNumber,
   IsObject,
   IsOptional,
@@ -9,12 +10,26 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
+import { ApplicationType } from '../../../common/enums';
 
 export class UpdateApplicationDto {
   @ApiPropertyOptional({ example: 'Updated Study Title' })
   @IsOptional()
   @IsString()
   title?: string;
+
+  @ApiPropertyOptional({
+    enum: ApplicationType,
+    description: 'Updated application type',
+  })
+  @IsOptional()
+  @IsEnum(ApplicationType)
+  type?: ApplicationType;
+
+  @ApiPropertyOptional({ description: 'Updated IRB tenant UUID' })
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
 
   @ApiPropertyOptional({ description: 'UUID of the destination institution' })
   @IsOptional()

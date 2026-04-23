@@ -62,9 +62,15 @@ let QueriesService = class QueriesService {
         return this.database.query.findMany({
             where: { applicationId },
             include: {
-                responses: { orderBy: { createdAt: 'asc' } },
+                raisedBy: { select: { id: true, firstName: true, lastName: true } },
+                responses: {
+                    orderBy: { createdAt: 'asc' },
+                    include: {
+                        responder: { select: { id: true, firstName: true, lastName: true } },
+                    },
+                },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: 'asc' },
         });
     }
     async respondToQuery(applicationId, queryId, userId, dto) {

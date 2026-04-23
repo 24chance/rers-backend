@@ -8,5 +8,6 @@ export declare class PaymentsService {
     constructor(database: DatabaseService, receiptsService: ReceiptsService);
     create(invoiceId: string, dto: CreatePaymentDto): Promise<any>;
     verify(paymentId: string, officerId: string, dto: VerifyPaymentDto): Promise<any>;
+    findAll(tenantId?: string): Promise<any[]>;
     findByInvoice(invoiceId: string): Promise<any[]>;
 }

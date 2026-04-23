@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -38,19 +39,37 @@ export class DecisionsService {
 
     const actor = await this.database.user.findUnique({
       where: { id: actorId },
-      select: { id: true, role: true, tenantId: true },
+      select: {
+        id: true,
+        tenantId: true,
+        role: { select: { name: true } },
+      },
     });
 
     if (!actor) {
       throw new NotFoundException(`User "${actorId}" not found.`);
     }
 
-    if (
-      (actor.role === UserRole.IRB_ADMIN || actor.role === UserRole.CHAIRPERSON)
-      && application.tenantId !== actor.tenantId
-    ) {
+    if (actor.role.name !== UserRole.CHAIRPERSON) {
+      throw new ForbiddenException(
+        'Only the chairperson can record the final decision on an application.',
+      );
+    }
+
+    if (application.tenantId !== actor.tenantId) {
       throw new ForbiddenException(
         'You can only record decisions for applications in your tenant.',
+      );
+    }
+
+    const existingDecision = await this.database.decision.findFirst({
+      where: { applicationId },
+      select: { id: true },
+    });
+
+    if (existingDecision) {
+      throw new BadRequestException(
+        'A final decision has already been recorded for this application.',
       );
     }
 

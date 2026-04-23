@@ -17,6 +17,10 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const EDITABLE_STATUSES = new Set<ApplicationStatus>([
+  ApplicationStatus.DRAFT,
+  ApplicationStatus.QUERY_RAISED,
+]);
 const TENANT_SCOPED_ROLES = new Set<UserRole>([
   UserRole.IRB_ADMIN,
   UserRole.CHAIRPERSON,
@@ -187,6 +191,29 @@ export class ApplicationsService {
       throw new ForbiddenException('You do not have access to this application.');
     }
 
+    if (role === UserRole.REVIEWER) {
+      const hasAccess = await Promise.all([
+        this.database.reviewAssignment.findFirst({
+          where: {
+            applicationId: id,
+            reviewerId: userId,
+          },
+        }),
+        this.database.review.findFirst({
+          where: {
+            applicationId: id,
+            reviewerId: userId,
+          },
+        }),
+      ]);
+
+      if (!hasAccess.some(Boolean)) {
+        throw new ForbiddenException(
+          'You do not have access to applications that are not assigned to you.',
+        );
+      }
+    }
+
     if (TENANT_SCOPED_ROLES.has(role)) {
       const user = await this.database.user.findUnique({
         where: { id: userId },
@@ -215,9 +242,9 @@ export class ApplicationsService {
       throw new NotFoundException(`Application with id "${id}" not found.`);
     }
 
-    if (application.status !== ApplicationStatus.DRAFT) {
+    if (!EDITABLE_STATUSES.has(application.status)) {
       throw new BadRequestException(
-        `Only DRAFT applications can be edited. Current status: "${application.status}".`,
+        `Only ${Array.from(EDITABLE_STATUSES).join(' or ')} applications can be edited. Current status: "${application.status}".`,
       );
     }
 
@@ -229,6 +256,8 @@ export class ApplicationsService {
       where: { id },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.type !== undefined && { type: dto.type }),
+        ...(dto.tenantId !== undefined && { tenantId: dto.tenantId }),
         ...(dto.destinationId !== undefined && { destinationId: dto.destinationId }),
         ...(dto.principalInvestigator !== undefined && {
           principalInvestigator: dto.principalInvestigator,

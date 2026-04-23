@@ -1,5 +1,8 @@
+import { ApplicationType } from '../../../common/enums';
 export declare class UpdateApplicationDto {
     title?: string;
+    type?: ApplicationType;
+    tenantId?: string;
     destinationId?: string;
     principalInvestigator?: string;
     coInvestigators?: string[];

@@ -34,6 +34,12 @@ let PaymentsController = class PaymentsController {
     findByInvoice(invoiceId) {
         return this.paymentsService.findByInvoice(invoiceId);
     }
+    findAll(user) {
+        const tenantId = user.role === user_role_enum_1.UserRole.FINANCE_OFFICER || user.role === user_role_enum_1.UserRole.IRB_ADMIN
+            ? (user.tenantId ?? undefined)
+            : undefined;
+        return this.paymentsService.findAll(tenantId);
+    }
     verify(id, dto, user) {
         return this.paymentsService.verify(id, user.id, dto);
     }
@@ -63,6 +69,16 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], PaymentsController.prototype, "findByInvoice", null);
+__decorate([
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.FINANCE_OFFICER, user_role_enum_1.UserRole.IRB_ADMIN, user_role_enum_1.UserRole.RNEC_ADMIN, user_role_enum_1.UserRole.SYSTEM_ADMIN),
+    (0, common_1.Get)('payments'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all payments (FINANCE_OFFICER / admin)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Payments returned.' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], PaymentsController.prototype, "findAll", null);
 __decorate([
     (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.FINANCE_OFFICER, user_role_enum_1.UserRole.IRB_ADMIN, user_role_enum_1.UserRole.RNEC_ADMIN, user_role_enum_1.UserRole.SYSTEM_ADMIN),
     (0, common_1.Patch)('payments/:id/verify'),

@@ -16,6 +16,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -30,7 +32,7 @@ export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   // POST /invoices/application/:applicationId
-  @Roles(UserRole.IRB_ADMIN, UserRole.RNEC_ADMIN, UserRole.FINANCE_OFFICER, UserRole.SYSTEM_ADMIN)
+  @Roles(UserRole.FINANCE_OFFICER)
   @Post('application/:applicationId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an invoice for an application' })
@@ -40,8 +42,13 @@ export class InvoicesController {
   create(
     @Param('applicationId') applicationId: string,
     @Body() dto: CreateInvoiceDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.invoicesService.create(applicationId, dto);
+    return this.invoicesService.create(applicationId, dto, {
+      id: user.id,
+      role: user.role,
+      tenantId: user.tenantId ?? null,
+    });
   }
 
   // GET /invoices/application/:applicationId
@@ -58,7 +65,12 @@ export class InvoicesController {
   @Get()
   @ApiOperation({ summary: 'Get all invoices (FINANCE_OFFICER / admin)' })
   @ApiResponse({ status: 200, description: 'Invoices returned.' })
-  findAll() {
-    return this.invoicesService.findAll();
+  findAll(@CurrentUser() user: JwtPayload) {
+    const tenantId =
+      user.role === UserRole.FINANCE_OFFICER || user.role === UserRole.IRB_ADMIN
+        ? (user.tenantId ?? undefined)
+        : undefined;
+
+    return this.invoicesService.findAll(tenantId);
   }
 }
